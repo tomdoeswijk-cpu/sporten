@@ -26,7 +26,7 @@ export const DEFAULT = () => ({
   sessions: [], // {id, ts, date, kind, sport, title, minutes, km, refId, counts:{sport,core,mob}, score, detail}
   peil: [], // {id, date, test, value}
   plans: {}, // weekKey -> {slots:[{day,time,what}], made}
-  settings: { anchor: '21:00', ritualMin: 10, start: null, lastBackup: null, anchorCal: false, pullLevel: null },
+  settings: { anchor: '21:00', ritualMin: 10, start: null, lastBackup: null, anchorCal: false, pullLevel: null, reportSeen: null },
 });
 
 let state = DEFAULT();

@@ -6,6 +6,8 @@ import * as L from './logic.js';
 import { Player, compileWorkout, compileRoutine, compileCombi, compileBDN, compilePeil } from './player.js';
 import * as C from './charts.js';
 import { icon, sportIcon } from './icons.js';
+import { analyzeWorkout, monthReport, monthKey, prevMonthKey, reportReady, monthName } from './analysis.js';
+import { warmupPlan, mainIds } from './player.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const h = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
@@ -46,7 +48,7 @@ function startWorkout(w) {
   const plan = compileWorkout(w);
   const b = isGezin ? null : L.best(w.id, plan.scoreType);
   new Player({
-    title: w.name, plan,
+    title: w.name, plan, kids: isGezin,
     ghost: b?.s.score.taps || null,
     prBest: plan.scoreType === 'amrap' ? b?.s.score : null,
     onQuit: render,
@@ -75,7 +77,9 @@ function showResult(w, s, prev, scoreType) {
     body = `<div class="result-score">${s.score?.sets?.length || 0} sets</div>`;
     pr = prs.length ? `<div class="pr">${icon('trophy')} PR op ${prs.map((e) => EX[e].name).join(', ')}</div>` : '';
   }
-  const c = h(`<div class="sheet-body center"><div class="big-check">✓</div><h2>${esc(w.name)} gedaan</h2>${body}${pr}
+  const an = scoreType ? analyzeWorkout(w, s, prev) : { chart: '', notes: [] };
+  const anHtml = an.chart || an.notes.length ? `<div class="analysis">${an.chart ? `<div class="label">Tijd per ronde${prev?.s?.score?.taps ? ' · <span class="lg-m">jij</span> <span class="lg-g">spook</span>' : ''}</div>${an.chart}` : ''}${an.notes.map((n) => `<p class="obs">${icon('spark')}<span>${n}</span></p>`).join('')}</div>` : '';
+  const c = h(`<div class="sheet-body center"><div class="big-check">✓</div><h2>${esc(w.name)} gedaan</h2>${body}${pr}${anHtml}
     <p class="muted">${s.minutes} min · telt mee voor ${goalChips(s.counts)}</p>
     <div class="stack"><button class="btn primary" data-add>+ Plak er 5 min mobility aan</button><button class="btn ghost" data-close>Klaar</button></div></div>`);
   const close = sheet(c);
@@ -174,6 +178,13 @@ function viewVandaag() {
   el.append(h(`<section class="card weekhero"><div class="wh-top"><div class="wh-rings">${weekRings(w)}<div class="wh-c"><b>${w.sport + w.core + w.mob}</b><small>van 9</small></div></div>
     <div class="wh-list">${row('sport', 'Sport', w.sport)}${row('core', 'Core', w.core)}${row('mob', 'Mobility', w.mob)}<p class="wh-meta">${w.minutes} min · ${ad} ${ad === 1 ? 'actieve dag' : 'actieve dagen'}</p></div></div>
     ${dayStrip(w)}${w.allMet ? `<p class="win">${icon('trophy')} Alle doelen gehaald deze week</p>` : ''}</section>`));
+
+  const rr = reportReady();
+  if (rr) {
+    const b = h(`<button class="card irow report">${tile('spark', 'violet')}<div><b>Je ${monthName(rr).split(' ')[0]}-rapport staat klaar</b><span>Wanneer je plan doorging, wat werkte, en één ding voor deze maand.</span></div>${icon('arrow', 'go')}</button>`);
+    b.onclick = () => { ui.tab = 'voortgang'; ui.prog = 'maand'; ui.month = rr; go(); };
+    el.append(b);
+  }
 
   const pi = L.peilInfo();
   if (pi.isPeil) {
@@ -429,7 +440,7 @@ function workoutDetail(w) {
   const type = w.type === 'gezin' ? { label: 'Gezin', uitleg: w.uitleg } : TYPES[w.type];
   const formatTxt = k === 'tabata' ? `${m.blocks.length}× Tabata: 8 rondes van 20 sec werk / 10 sec rust, 1 min rust tussen blokken. Na elk blok vul je je reps in.` : k === '4020' ? `${m.rounds} rondes van 40 sec werk / 20 sec rust. Aan het eind vul je je totaal aantal reps in.` : k === 'emom' ? `Elke minuut start je de opdracht; wat over is van de minuut is rust. ${m.minutes} minuten.` : k === 'amrap' ? 'Zoveel mogelijk rondes. Tik na elke ronde op de grote knop: dan telt de app je score en rent je spook mee.' : k === 'fortime' ? 'Zo snel mogelijk, binnen de tijdslimiet. Tik na elke ronde op de knop voor je tussentijden.' : k === 'kracht' ? 'Per set log je gewicht en reps; de rusttimer start vanzelf. Je ziet wat je vorige keer deed.' : type.uitleg;
   const c = h(`<div class="sheet-body"><div class="eyebrow">${type.label}${w.dur ? ` · ${w.dur} min` : ''}</div><h2>${esc(w.name)}</h2><p class="muted">${formatTxt}</p>
-    ${w.dur && w.type !== 'gezin' ? `<p class="small muted">Inclusief ${Math.round(SPLIT_OF(w)[0] / 60)} min warming-up en ${Math.round(SPLIT_OF(w)[2] / 60)} min cooldown.</p>` : ''}
+    ${(() => { const wp = warmupPlan(mainIds(w)); const names = [wp.pulse, ...wp.prep].slice(0, 5).map((x) => EX[x].name).join(' · '); return `<div class="wu"><div class="label">Warming-up${w.type !== 'gezin' ? ` · ${Math.round(SPLIT_OF(w)[0] / 60)} min` : ''}${wp.patterns.length ? ` · afgestemd op ${wp.patterns.join(', ')}` : ''}</div><p class="small muted">${names}</p></div>`; })()}
     <div class="label">Oefeningen</div></div>`);
   c.append(exList(ids, amt));
   const b = h(`<button class="btn primary xl sticky">Start ${esc(w.name)}</button>`);
@@ -533,15 +544,37 @@ function peilView() {
 function viewVoortgang() {
   const el = h(`<div class="view"><header class="hero row"><h1>Voortgang</h1><button class="icon-btn" aria-label="Instellingen" data-set>${icon('gear')}</button></header></div>`);
   $('[data-set]', el).onclick = settingsSheet;
-  el.append(seg([['weken', 'Weken'], ['sporten', 'Sporten'], ['prs', "PR's"], ['peil', 'Peil']], ui.prog, (v) => { ui.prog = v; go(); }, 'tabs'));
+  el.append(seg([['weken', 'Weken'], ['maand', 'Maand'], ['sporten', 'Sporten'], ['prs', "PR's"], ['peil', 'Peil']], ui.prog, (v) => { ui.prog = v; go(); }, 'tabs'));
   const st = store.get();
+  if (ui.prog === 'maand') {
+    ui.month ||= new Date().getDate() <= 7 ? prevMonthKey(monthKey()) : monthKey();
+    if (ui.month !== monthKey()) store.update((x) => { if (ui.month === prevMonthKey(monthKey())) x.settings.reportSeen = ui.month; });
+    el.append(monthReport(ui.month, { onNav: (k) => { ui.month = k; render(); } }));
+    return el;
+  }
   if (!st.sessions.length && ui.prog !== 'peil') {
     el.append(h(`<div class="card empty"><h3>Nog geen data</h3><p class="muted">Turf je eerste sessie of doe een workout. Na een paar weken wordt dit je favoriete scherm.</p></div>`));
     return el;
   }
   if (ui.prog === 'weken') el.append(C.weeksView());
   if (ui.prog === 'sporten') el.append(C.sportsView());
-  if (ui.prog === 'prs') el.append(C.prView());
+  if (ui.prog === 'prs') {
+    const v = C.prView();
+    v.addEventListener('click', (e) => {
+      const r = e.target.closest('[data-ref]'); if (!r) return;
+      const w = L.workoutById(r.dataset.ref); const hs = L.historyOf(r.dataset.ref); if (!w || !hs.length) return;
+      const last = hs.at(-1), type = last.score.type;
+      const before = hs.slice(0, -1).reduce((b, x) => { const val = L.scoreValue(type, x.score); return val != null && (!b || val > b.v) ? { v: val, s: x } : b; }, null);
+      const an = analyzeWorkout(w, last, before);
+      const c = h(`<div class="sheet-body"><div class="eyebrow">Laatste keer · ${L.fmtDate(last.date)}</div><h2>${esc(w.name)}</h2><div class="result-score">${L.scoreText(type, last.score)}</div>
+        <div class="analysis">${an.chart ? `<div class="label">Tijd per ronde${before?.s?.score?.taps ? ' · <span class="lg-m">jij</span> <span class="lg-g">beste ervoor</span>' : ''}</div>${an.chart}` : ''}${an.notes.map((n) => `<p class="obs">${icon('spark')}<span>${n}</span></p>`).join('') || '<p class="muted small">Nog te weinig data voor een analyse.</p>'}</div>
+        <div class="label">Geschiedenis</div><div class="hist">${[...hs].reverse().map((x) => `<div><span>${L.fmtDate(x.date)}</span><b>${L.scoreText(type, x.score)}</b></div>`).join('')}</div>
+        <button class="btn primary" data-go>${icon('play')} Opnieuw doen</button></div>`);
+      const close = sheet(c);
+      $('[data-go]', c).onclick = () => { close(); workoutDetail(w); };
+    });
+    el.append(v);
+  }
   if (ui.prog === 'peil') el.append(C.peilView());
   return el;
 }

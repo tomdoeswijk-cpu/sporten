@@ -13,10 +13,37 @@ const WARM = ['jumping-jack', 'arm-circles', 'inchworm', 'high-knees', 'leg-swin
 const COOL = ['childs-pose', 'hip-flexor', 'pec-stretch', 'couch-stretch', 'breathing-9090'];
 const timed = (ex, sec, o = {}) => ({ kind: 'timed', ex, sec, ...o });
 
-function warmup(sec) {
-  const out = []; let t = 0, i = 0;
-  while (t < sec) { const d = Math.min(40, sec - t); out.push(timed(WARM[i % WARM.length], d, { phase: 'Warming-up' })); t += d; i++; }
+// Warming-up op maat: eerst hartslag omhoog met het apparaat uit de workout, dan de bewegingspatronen voorbereiden.
+const PATTERNS = {
+  trekken: { ex: ['pullup', 'chinup', 'neg-pullup', 'band-pullup', 'lat-pulldown', 'seated-row', 'trx-row', 'hanging-knee-raise'], prep: ['scap-pullup', 'face-pull', 'dead-hang'] },
+  duwen: { ex: ['pushup', 'incline-pushup', 'pike-pushup', 'chest-press', 'shoulder-press', 'burpee', 'burpee-broad-jump', 'kiss-pushup'], prep: ['arm-circles', 'inchworm', 'bear-plank-tap'] },
+  squat: { ex: ['air-squat', 'jump-squat', 'reverse-lunge', 'bulgarian', 'skater', 'kid-squat'], prep: ['leg-swings', 'wgs', 'cossack'] },
+  hinge: { ex: ['pull-through', 'trx-ham-curl', 'sl-glute-bridge', 'broad-jump', 'burpee-broad-jump'], prep: ['glute-bridge', 'leg-swings', 'inchworm'] },
+  core: { ex: ['hollow-rock', 'mountain-climber', 'trx-knee-tuck', 'trx-fallout', 'hanging-knee-raise'], prep: ['dead-bug', 'bird-dog'] },
+};
+export function warmupPlan(ids) {
+  const set = new Set(ids);
+  const pulse = set.has('row') ? 'row' : set.has('bike') ? 'bike' : set.has('single-under') || set.has('double-under') ? 'single-under' : 'jumping-jack';
+  const pats = Object.entries(PATTERNS).filter(([, p]) => p.ex.some((e) => set.has(e)));
+  const order = [];
+  for (let r = 0; r < 3; r++) for (const [, p] of pats) if (p.prep[r] && !order.includes(p.prep[r])) order.push(p.prep[r]);
+  return { pulse, prep: order, patterns: pats.map(([k]) => k) };
+}
+function warmup(sec, ids = []) {
+  const plan = warmupPlan(ids);
+  const out = [timed(plan.pulse, Math.min(60, Math.round(sec / 4)), { phase: 'Warming-up', note: plan.pulse === 'jumping-jack' ? '' : 'rustig tempo' })];
+  let t = out[0].sec;
+  const list = [...plan.prep, ...WARM.filter((x) => !plan.prep.includes(x))];
+  let i = 0;
+  while (t < sec) { const d = Math.min(40, sec - t); const ex = list[i % list.length]; out.push(timed(ex, d, { phase: 'Warming-up', ...(EX[ex].uni && d >= 30 ? { switchAt: Math.round(d / 2) } : {}) })); t += d; i++; }
   return out;
+}
+export function mainIds(w) {
+  const m = w.main, k = m.kind || w.type;
+  if (k === 'kracht') return m.sets.map((x) => resolveEx(x.ex));
+  if (k === 'tabata') return m.blocks.flat();
+  if (k === 'timed') return m.list.map(([e]) => e);
+  return m.steps.map((x) => resolveEx(x.ex));
 }
 function cooldown(sec) {
   const out = []; let t = 0, i = 0;
@@ -70,12 +97,12 @@ function mainBlock(main, type, mainSec) {
 
 export function compileWorkout(w) {
   if (w.type === 'gezin') {
-    const segs = [...warmup(120), ...mainBlock(w.main, w.main.kind, 600), ...cooldown(60)];
+    const segs = [...warmup(120, mainIds(w)), ...mainBlock(w.main, w.main.kind, 600), ...cooldown(60)];
     return { segs: segs.filter((x) => x.kind !== 'input'), scoreType: null };
   }
   const [wu, mainSec, cd] = SPLIT[w.dur];
   const kind = w.main.kind || w.type;
-  return { segs: [...warmup(wu), ...mainBlock(w.main, w.type, mainSec), ...cooldown(cd)], scoreType: kind === 'tabata' || kind === '4020' ? 'interval' : kind };
+  return { segs: [...warmup(wu, mainIds(w)), ...mainBlock(w.main, w.type, mainSec), ...cooldown(cd)], scoreType: kind === 'tabata' || kind === '4020' ? 'interval' : kind };
 }
 
 function routineSegs(items, seg) {
@@ -96,7 +123,7 @@ export const compileRoutine = (r, min) => ({ segs: routineSegs(routineItems(r, m
 export const compileCombi = (core, mob) => ({ segs: [...routineSegs(core.items.slice(0, 5), 'core'), ...routineSegs(mob.items.slice(0, 5), mob.seg)], scoreType: null });
 export const compileBDN = () => ({ segs: BDN.steps.map((st) => (st.sec ? timed(st.ex, st.sec) : { kind: 'reps', ex: st.ex, reps: st.reps })), scoreType: null });
 export function compilePeil() {
-  const segs = [...warmup(240)];
+  const segs = [...warmup(240, ['pushup', 'pullup', 'bulgarian', 'broad-jump', 'hollow-rock'])];
   for (const id of PEIL_KRACHT) { segs.push({ kind: 'test', test: id }); segs.push({ kind: 'rest', sec: 60, short: true, next: testById(PEIL_KRACHT[PEIL_KRACHT.indexOf(id) + 1])?.ex }); }
   segs.pop();
   segs.push({ kind: 'photo' });
@@ -116,6 +143,38 @@ function beep(f = 880, d = 0.12, vol = 0.25) {
 }
 const buzz = (p) => { try { navigator.vibrate?.(p); } catch {} };
 
+// ───────── gezinsmodus: dieren & deuntjes ─────────
+const ANIMALS = {
+  'bear-crawl': ['🐻', 'Beer!', '#c98a4b', [196, 247, 196, 147]],
+  'crab-walk': ['🦀', 'Krab!', '#ff6b5b', [523, 659, 523, 659]],
+  'jump-squat': ['🐸', 'Kikker!', '#5fd068', [392, 523, 784]],
+  flamingo: ['🦩', 'Flamingo!', '#ff8fc7', [880, 988, 1175]],
+  run: ['🐆', 'Vang papa!', '#f5c84c', [660, 784, 880, 1046]],
+  'kid-squat': ['🐘', 'Olifant op papa\'s rug!', '#9db4c8', [131, 165, 196, 262]],
+  'kiss-pushup': ['💋', 'Kusjes!', '#ff6fa3', [784, 659, 784, 988]],
+  'tunnel-plank': ['🚂', 'Trein door de tunnel!', '#7dd3fc', [440, 440, 554, 659]],
+  'glute-bridge': ['🌉', 'Brug!', '#9d8cff', [330, 440, 554]],
+  'sun-salutation': ['☀️', 'Zonnetje!', '#ffd24c', [523, 659, 784, 1046]],
+  'childs-pose': ['🐢', 'Schildpad', '#3fbf9f', [262, 330, 262]],
+  'jumping-jack': ['⭐', 'Sterren springen!', '#ffd24c', [659, 784, 988]],
+  'arm-circles': ['🚁', 'Helikopter!', '#7dd3fc', [440, 523, 440, 523]],
+  inchworm: ['🐛', 'Rups!', '#8bd35a', [294, 330, 392]],
+  'high-knees': ['🏇', 'Paardje!', '#e0a96d', [523, 523, 659, 659]],
+  'leg-swings': ['🐒', 'Aapje!', '#c98a4b', [587, 698, 587]],
+};
+const animal = (id) => ANIMALS[id] || ['🎈', EX[id]?.name || '', '#c6f432', [523, 659]];
+function jingle(notes) {
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    notes.forEach((f, i) => {
+      const t = ac.currentTime + i * 0.13, o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'triangle'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+      o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.26);
+    });
+  } catch {}
+}
+
 // ───────── speler ─────────
 const h = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 const amount = (st, round = 0) => {
@@ -127,8 +186,8 @@ const amount = (st, round = 0) => {
 };
 
 export class Player {
-  constructor({ title, plan, ghost, prBest, onFinish, onQuit, bdn }) {
-    Object.assign(this, { title, segs: plan.segs, scoreType: plan.scoreType, ghost, prBest, onFinish, onQuit, bdn });
+  constructor({ title, plan, ghost, prBest, onFinish, onQuit, bdn, kids }) {
+    Object.assign(this, { title, segs: plan.segs, scoreType: plan.scoreType, ghost, prBest, onFinish, onQuit, bdn, kids });
     this.i = 0; this.score = { type: plan.scoreType }; this.sets = []; this.tests = []; this.photo = null;
     this.t0 = performance.now(); this.segStart = this.t0; this.paused = false; this.pauseAcc = 0; this.pausedAt = 0;
     this.lastBeep = -1; this.rounds = 0; this.taps = [];
@@ -177,7 +236,7 @@ export class Player {
   shell(inner, { phase, accent } = {}) {
     const pct = Math.round((this.i / this.segs.length) * 100);
     this.root.innerHTML = '';
-    const el = h(`<div class="p-wrap ${accent || ''}">
+    const el = h(`<div class="p-wrap ${accent || ''} ${this.kids ? 'kids' : ''}">
       <div class="p-top"><button class="p-x" aria-label="Stoppen">✕</button><div class="p-title"><small>${phase || this.title}</small><span>${this.title}</span></div><button class="p-pause">Pauze</button></div>
       <div class="p-prog"><i style="width:${pct}%"></i></div>
       <div class="p-body"></div></div>`);
@@ -199,13 +258,20 @@ export class Player {
     const s = this.seg;
     const r = this[`r_${s.kind}`];
     r.call(this, s);
+    if (this.kids && s.kind === 'timed') jingle(animal(s.ex)[3]);
+  }
+  kidHero(exId, note) {
+    const [e, n, c] = animal(exId);
+    const el = h(`<div class="kid-hero" style="--k:${c}"><div class="kid-emoji">${e}</div><div class="kid-name">${note && !ANIMALS[exId] ? note : n}</div></div>`);
+    return el;
   }
 
   // ── segmenttypes ──
   r_timed(s) {
     const ex = EX[s.ex];
     const box = h(`<div class="p-col"></div>`);
-    box.append(this.exCard(s.ex));
+    if (this.kids) { box.append(this.kidHero(s.ex, s.note)); box.style.setProperty('--c', animal(s.ex)[2]); box.style.setProperty('--k', animal(s.ex)[2]); }
+    box.append(this.exCard(s.ex, !this.kids));
     const meta = h(`<div class="p-meta">${s.label ? `<span>${s.label}</span>` : ''}${s.note ? `<span class="pill">${s.note}</span>` : ''}${s.switchAt ? '<span class="pill">links → rechts</span>' : ''}</div>`);
     box.append(meta);
     box.append(h(dial(fmtTime(s.sec))));
@@ -217,7 +283,8 @@ export class Player {
   }
   r_rest(s) {
     const box = h(`<div class="p-col rest"><div class="p-rest-label">Rust · adem</div>${dial(fmtTime(s.sec), 'rest')}</div>`);
-    if (s.next) { box.append(h(`<div class="p-next">Hierna</div>`)); box.append(this.exCard(s.next, false)); }
+    if (s.next && this.kids) { box.append(h(`<div class="p-next">Even uitblazen… hierna:</div>`)); box.append(this.kidHero(s.next)); }
+    else if (s.next) { box.append(h(`<div class="p-next">Hierna</div>`)); box.append(this.exCard(s.next, false)); }
     const skip = h(`<button class="btn ghost">Rust overslaan ›</button>`); skip.onclick = () => this.next(); box.append(skip);
     this.shell(box, { phase: 'Rust', accent: 'rest' });
   }
@@ -231,7 +298,7 @@ export class Player {
   circuit(s, round = 0) {
     const ul = h(`<div class="p-circuit"></div>`);
     s.steps.forEach((st) => {
-      const row = h(`<button class="p-step"><span class="amt">${amount(st, round)}</span><span class="nm">${EX[st.ex].name}${st.note ? ` <small>${st.note}</small>` : ''}</span><span class="i">i</span></button>`);
+      const row = h(`<button class="p-step"><span class="amt">${this.kids ? `${animal(st.ex)[0]} ` : ''}${amount(st, round)}</span><span class="nm">${EX[st.ex].name}${st.note ? ` <small>${st.note}</small>` : ''}</span><span class="i">i</span></button>`);
       row.onclick = () => this.showEx(st.ex);
       ul.append(row);
     });
@@ -289,7 +356,8 @@ export class Player {
     const st = s.steps[mi % s.steps.length];
     const cur = this.root.querySelector('[data-cur]');
     cur.innerHTML = '';
-    cur.append(this.exCard(st.ex));
+    if (this.kids) { cur.append(this.kidHero(st.ex, st.note)); if (mi > 0 || this.emomMin === 0) jingle(animal(st.ex)[3]); }
+    cur.append(this.exCard(st.ex, !this.kids));
     cur.append(h(`<div class="p-reps">${amount(st) || ''} ${st.note ? `<small>${st.note}</small>` : ''}</div>`));
     this.root.querySelector('[data-min]').textContent = mi + 1;
   }

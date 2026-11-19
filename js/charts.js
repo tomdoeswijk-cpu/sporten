@@ -152,7 +152,7 @@ export function prView() {
     const vals = xs.map((x) => (type === 'fortime' ? (x.score.capped ? null : x.score.sec) : L.scoreValue(type, x.score))).filter((v) => v != null);
     const last = xs.at(-1);
     const isPR = b && b.s.id === last.id && xs.length > 1;
-    c.append(h(`<div class="prrow"><div><b>${esc(w.name)}</b><small>${xs.length}× · ${L.fmtDate(last.date)}</small></div>${spark(vals, type === 'fortime')}<div class="prv"><b>${L.scoreText(type, b.s.score)}</b><small>${isPR ? '🏆 laatste = PR' : `laatst ${L.scoreText(type, last.score)}`}</small></div></div>`));
+    c.append(h(`<div class="prrow tap" data-ref="${ref}"><div><b>${esc(w.name)}</b><small>${xs.length}× · ${L.fmtDate(last.date)}</small></div>${spark(vals, type === 'fortime')}<div class="prv"><b>${L.scoreText(type, b.s.score)}</b><small>${isPR ? '🏆 laatste = PR' : `laatst ${L.scoreText(type, last.score)}`}</small></div></div>`));
   });
   box.append(c);
 
