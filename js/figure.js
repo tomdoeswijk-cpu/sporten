@@ -119,7 +119,14 @@ function render(pose, opts) {
   const pr = pose.props?.list || opts.props;
   const sideTorso = (pose.sw || 0) > 0;
   let s = '';
-  if (opts.floor !== false) s += `<line class="floor" x1="-60" y1="${G}" x2="260" y2="${G}"/>`;
+  if (opts.floor !== false) {
+    s += `<line class="floor" x1="-60" y1="${G}" x2="260" y2="${G}"/>`;
+    const low = ['ankleN', 'ankleF', 'toeN', 'toeF', 'wristN', 'wristF', 'kneeN', 'kneeF', 'hip', 'sh'].map((k) => j[k]).filter((q) => q[1] > G - 16);
+    if (low.length) {
+      const x0 = Math.min(...low.map((q) => q[0])), x1 = Math.max(...low.map((q) => q[0]));
+      s += `<ellipse class="shadow" cx="${((x0 + x1) / 2).toFixed(1)}" cy="${G + 1}" rx="${((x1 - x0) / 2 + 14).toFixed(1)}" ry="4"/>`;
+    }
+  }
   s += drawProps(pr, j, false);
   // achterste ledematen
   s += seg(j.shF, j.elbowF, 'limb far') + seg(j.elbowF, j.wristF, 'limb far');
@@ -127,7 +134,7 @@ function render(pose, opts) {
   // romp en hoofd
   if (sideTorso) s += seg(j.shN, j.shF, 'torso') + seg(j.hipN, j.hipF, 'torso');
   s += seg(j.hip, j.sh, 'torso') + seg(j.sh, j.neckEnd, 'neck');
-  s += `<circle class="head" cx="${j.head[0].toFixed(1)}" cy="${j.head[1].toFixed(1)}" r="${L.head}"/>`;
+  s += `<circle class="head" cx="${j.head[0].toFixed(1)}" cy="${j.head[1].toFixed(1)}" r="${L.head}"/><circle class="head-hl" cx="${(j.head[0] - 2.6).toFixed(1)}" cy="${(j.head[1] - 2.8).toFixed(1)}" r="3"/>`;
   // voorste ledematen
   s += seg(j.hipN, j.kneeN, 'limb') + seg(j.kneeN, j.ankleN, 'limb') + seg(j.ankleN, j.toeN, 'foot');
   s += seg(j.shN, j.elbowN, 'limb') + seg(j.elbowN, j.wristN, 'limb');

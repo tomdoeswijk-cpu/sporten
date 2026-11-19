@@ -3,6 +3,10 @@ import { EX } from './exercises.js';
 import { figure } from './figure.js';
 import { SPLIT, routineItems, BDN, TESTS, PEIL_KRACHT } from './data.js';
 import { resolveEx, fmtTime, liftLast, testById } from './logic.js';
+import { icon } from './icons.js';
+
+const RC = 2 * Math.PI * 70;
+const dial = (txt, cls = '') => `<div class="p-dial ${cls}"><svg viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="70" class="trk"/><circle cx="80" cy="80" r="70" class="prog" data-ring stroke-dasharray="${RC.toFixed(1)}" stroke-dashoffset="0" transform="rotate(-90 80 80)"/></svg><div class="p-clock" data-clock>${txt}</div></div>`;
 
 // ───────── compileren ─────────
 const WARM = ['jumping-jack', 'arm-circles', 'inchworm', 'high-knees', 'leg-swings', 'air-squat'];
@@ -204,15 +208,15 @@ export class Player {
     box.append(this.exCard(s.ex));
     const meta = h(`<div class="p-meta">${s.label ? `<span>${s.label}</span>` : ''}${s.note ? `<span class="pill">${s.note}</span>` : ''}${s.switchAt ? '<span class="pill">links → rechts</span>' : ''}</div>`);
     box.append(meta);
-    box.append(h(`<div class="p-clock" data-clock>${fmtTime(s.sec)}</div>`));
+    box.append(h(dial(fmtTime(s.sec))));
     box.append(h(`<div class="p-side" data-side></div>`));
     const nx = this.segs.slice(this.i + 1).find((x) => x.ex);
     box.append(h(`<div class="p-next">${nx ? `Hierna: <b>${EX[nx.ex].name}</b>` : 'Laatste oefening!'}</div>`));
     const skip = h(`<button class="btn ghost">Overslaan ›</button>`); skip.onclick = () => this.next(); box.append(skip);
-    this.shell(box, { phase: s.phase || (s.work ? 'Werk' : ex.cat === 'core' ? 'Core' : ''), accent: s.work ? 'work' : '' });
+    this.shell(box, { phase: s.phase || (s.work ? 'Werk' : ({ core: 'Core', mobility: 'Mobility', posture: 'Posture' })[ex.cat] || ''), accent: s.work ? 'work' : s.phase ? 'warm' : ({ core: 'core', mobility: 'mob', posture: 'mob' })[ex.cat] || '' });
   }
   r_rest(s) {
-    const box = h(`<div class="p-col rest"><div class="p-rest-label">Rust</div><div class="p-clock" data-clock>${fmtTime(s.sec)}</div></div>`);
+    const box = h(`<div class="p-col rest"><div class="p-rest-label">Rust · adem</div>${dial(fmtTime(s.sec), 'rest')}</div>`);
     if (s.next) { box.append(h(`<div class="p-next">Hierna</div>`)); box.append(this.exCard(s.next, false)); }
     const skip = h(`<button class="btn ghost">Rust overslaan ›</button>`); skip.onclick = () => this.next(); box.append(skip);
     this.shell(box, { phase: 'Rust', accent: 'rest' });
@@ -243,21 +247,21 @@ export class Player {
   }
   r_amrap(s) {
     this.rounds = 0; this.taps = [];
-    const box = h(`<div class="p-col"><div class="p-clock" data-clock>${fmtTime(s.sec)}</div>
+    const box = h(`<div class="p-col">${dial(fmtTime(s.sec), 'wide')}
       <div class="p-ghost" data-ghost></div></div>`);
     box.append(this.circuit(s));
     const b = h(`<button class="btn primary xl round">Ronde klaar <b data-rounds>0</b></button>`);
     b.onclick = () => {
       this.rounds++; this.taps.push(Math.round(this.elapsed())); beep(990, 0.08); buzz(40);
       b.querySelector('[data-rounds]').textContent = this.rounds;
-      if (this.prBest && this.rounds === this.prBest.rounds + 1) this.toast('🔥 Je zit boven je PR!');
+      if (this.prBest && this.rounds === this.prBest.rounds + 1) this.toast(`${icon('flame')} Je zit boven je PR!`);
     };
     box.append(b);
     this.shell(box, { phase: 'AMRAP', accent: 'work' });
   }
   r_fortime(s) {
     this.rounds = 0; this.taps = [];
-    const box = h(`<div class="p-col"><div class="p-clock up" data-clock>0:00</div><div class="p-sub">cap ${fmtTime(s.cap)} · ronde <b data-rn>1</b>/${s.rounds}</div>
+    const box = h(`<div class="p-col">${dial('0:00', 'wide up')}<div class="p-sub">cap ${fmtTime(s.cap)} · ronde <b data-rn>1</b>/${s.rounds}</div>
       <div class="p-ghost" data-ghost></div></div>`);
     const cwrap = h('<div></div>'); cwrap.append(this.circuit(s, 0)); box.append(cwrap);
     const b = h(`<button class="btn primary xl round">${s.rounds > 1 ? 'Ronde klaar' : 'Klaar!'}</button>`);
@@ -266,7 +270,7 @@ export class Player {
       this.taps.push(t); this.rounds++; beep(990, 0.08); buzz(40);
       if (this.ghost?.[this.rounds - 1] != null) {
         const d = this.ghost[this.rounds - 1] - t;
-        this.toast(d >= 0 ? `⚡ ${fmtTime(d)} sneller dan je spook` : `${fmtTime(-d)} achter je spook`);
+        this.toast(d >= 0 ? `${icon('ghost')} ${fmtTime(d)} sneller dan je spook` : `${icon('ghost')} ${fmtTime(-d)} achter je spook`);
       }
       if (this.rounds >= s.rounds) { this.score = { type: 'fortime', sec: t, taps: this.taps }; return this.next(); }
       box.querySelector('[data-rn]').textContent = this.rounds + 1;
@@ -278,7 +282,7 @@ export class Player {
   }
   r_emom(s) {
     this.emomMin = -1;
-    const box = h(`<div class="p-col"><div class="p-sub">Minuut <b data-min>1</b>/${s.minutes}</div><div class="p-clock" data-clock>1:00</div><div data-cur></div></div>`);
+    const box = h(`<div class="p-col"><div class="p-sub">Minuut <b data-min>1</b>/${s.minutes}</div><div data-cur></div>${dial('1:00')}</div>`);
     this.shell(box, { phase: 'EMOM', accent: 'work' });
   }
   emomRender(s, mi) {
@@ -359,7 +363,7 @@ export class Player {
   r_photo() {
     const box = h(`<div class="p-col center"><h2>Houdingsfoto</h2>
       <p class="muted">Zijaanzicht, op blote voeten, ontspannen staan zoals je normaal staat. Telefoon op heuphoogte, 2–3 meter afstand (zelfontspanner of laat iemand helpen). De foto blijft alleen op je telefoon.</p>
-      <label class="btn xl">📷 Foto maken<input type="file" accept="image/*" capture="environment" hidden></label><div class="p-photo"></div></div>`);
+      <label class="btn xl">${icon('camera')} Foto maken<input type="file" accept="image/*" capture="environment" hidden></label><div class="p-photo"></div></div>`);
     const inp = box.querySelector('input');
     inp.onchange = () => { const f = inp.files[0]; if (!f) return; this.photo = f; box.querySelector('.p-photo').innerHTML = `<img src="${URL.createObjectURL(f)}" alt="">`; };
     const ok = h(`<button class="btn primary xl">Afronden ✓</button>`); ok.onclick = () => this.next();
@@ -378,9 +382,11 @@ export class Player {
     const s = this.seg; if (!s) return;
     const el = this.elapsed();
     const clock = this.root.querySelector('[data-clock]');
-    const countdown = (total) => {
+    const ring = this.root.querySelector('[data-ring]');
+    const countdown = (total, span = total) => {
       const left = Math.max(0, total - el);
       if (clock) clock.textContent = fmtTime(Math.ceil(left));
+      if (ring) ring.setAttribute('stroke-dashoffset', (RC * (1 - left / span)).toFixed(1));
       const sec = Math.ceil(left);
       if (sec <= 3 && sec > 0 && sec !== this.lastBeep) { this.lastBeep = sec; beep(520, 0.1); }
       return left;
@@ -401,8 +407,8 @@ export class Player {
       if (g && this.ghost) {
         const gr = this.ghost.filter((t) => t <= el).length;
         const d = this.rounds - gr;
-        g.innerHTML = `Spook: ${gr} rondes · <b class="${d >= 0 ? 'up' : 'down'}">${d > 0 ? `+${d} voor` : d < 0 ? `${-d} achter` : 'gelijk'}</b>`;
-      } else if (g) g.textContent = 'Eerste keer: jij zet het spook neer.';
+        g.innerHTML = `${icon('ghost')} Spook: ${gr} rondes · <b class="${d >= 0 ? 'up' : 'down'}">${d > 0 ? `+${d} voor` : d < 0 ? `${-d} achter` : 'gelijk'}</b>`;
+      } else if (g) g.innerHTML = `${icon('ghost')} Eerste keer: jij zet het spook neer.`;
       if (left <= 0) {
         beep(440, 0.6); buzz([200, 100, 200]);
         this.score = { type: 'amrap', rounds: this.rounds, reps: 0, taps: this.taps };
@@ -411,9 +417,10 @@ export class Player {
       }
     } else if (s.kind === 'fortime') {
       if (clock) clock.textContent = fmtTime(el);
+      if (ring) ring.setAttribute('stroke-dashoffset', (RC * (1 - Math.min(1, el / s.cap))).toFixed(1));
       const g = this.root.querySelector('[data-ghost]');
-      if (g && this.ghost) { const gr = this.ghost.filter((t) => t <= el).length; g.innerHTML = `Spook is in ronde <b>${Math.min(gr + 1, s.rounds)}</b>`; }
-      else if (g) g.textContent = 'Eerste keer: jij zet het spook neer.';
+      if (g && this.ghost) { const gr = this.ghost.filter((t) => t <= el).length; g.innerHTML = `${icon('ghost')} Spook is in ronde <b>${Math.min(gr + 1, s.rounds)}</b>`; }
+      else if (g) g.innerHTML = `${icon('ghost')} Eerste keer: jij zet het spook neer.`;
       if (el >= s.cap) {
         beep(440, 0.6);
         this.score = { type: 'fortime', capped: true, progress: this.rounds, taps: this.taps };
@@ -428,7 +435,7 @@ export class Player {
         this.next(); return;
       }
       if (mi !== this.emomMin) { this.emomMin = mi; if (mi > 0) { beep(990, 0.2); buzz(120); } this.emomRender(s, mi); }
-      countdown((mi + 1) * 60);
+      countdown((mi + 1) * 60, 60);
     }
   }
 }

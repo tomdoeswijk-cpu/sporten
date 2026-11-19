@@ -1,0 +1,32 @@
+// Monoline-iconen (24×24, stroke = currentColor)
+const P = {
+  calendar: '<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
+  ruler: '<path d="M4 15.5 15.5 4 20 8.5 8.5 20z"/><path d="m8 12 2 2M11 9l2 2M14 6l2 2"/>',
+  flame: '<path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.4 2.6-5.2 3.6-8.3 2.4 1.4 3.2 3.4 3.4 4.8 1-.8 1.5-2 1.6-3.3 2.3 1.9 4.4 4.3 4.4 6.8 0 3.6-2.6 6.2-6.5 6.2z"/>',
+  trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4"/>',
+  dice: '<rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="9" cy="15" r="1.2" fill="currentColor"/>',
+  camera: '<path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.5-2h5L16 6h1.5A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/>',
+  bolt: '<path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/>',
+  shield: '<path d="M12 3 5 6v5.5c0 4.3 3 7.7 7 9.5 4-1.8 7-5.2 7-9.5V6z"/><path d="m9 12 2 2 4-4"/>',
+  cloud: '<path d="M7 18.5a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.4 1.6A3.8 3.8 0 0 1 17.5 18.5z"/><path d="M12 11v5M9.8 13.8 12 16l2.2-2.2"/>',
+  heart: '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/>',
+  play: '<path d="M8 5.5v13l10.5-6.5z"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>',
+  core: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.8" fill="currentColor"/>',
+  wave: '<path d="M3 12c2.2-4 4.4-4 6.6 0s4.4 4 6.6 0 3.6-3 4.8-1.5"/>',
+  person: '<circle cx="12" cy="5.5" r="2.2"/><path d="M12 8.5v6M8 11l4-1.5 4 1.5M12 14.5 9 20M12 14.5 15 20"/>',
+  run: '<circle cx="14.5" cy="4.5" r="2"/><path d="m6 20 3.5-5 3 2.5 1-5.5M8 11l3-3 3 2 3 1.5M12.5 12 15.5 15l-1 5"/>',
+  bike: '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16 9.5 8H14l4 8M9.5 8 12 16h-6M13 5.5h2.5"/>',
+  racket: '<ellipse cx="10" cy="9" rx="5.5" ry="6" transform="rotate(-35 10 9)"/><path d="m13.5 13.5 6 6M7 6.5l6 5M6 10l5 4"/>',
+  dumbbell: '<path d="M3 9v6M6 6.5v11M18 6.5v11M21 9v6M6 12h12"/>',
+  family: '<circle cx="8" cy="6" r="2.2"/><circle cx="16.5" cy="9.5" r="1.7"/><path d="M8 9v6M5 11.5 8 10l3 1.5M8 15l-2.2 5M8 15l2.2 5M16.5 12v4M16.5 16l-1.6 4M16.5 16l1.6 4M14.5 13.5h4"/>',
+  hyrox: '<path d="M4 18 9 6l3 7 3-4 5 9z"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  gear: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/>',
+  ghost: '<path d="M6 20V11a6 6 0 0 1 12 0v9l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5z"/><circle cx="10" cy="11" r="0.9" fill="currentColor"/><circle cx="14" cy="11" r="0.9" fill="currentColor"/>',
+};
+export const icon = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[name] || ''}</svg>`;
+export const sportIcon = { run: 'run', bike: 'bike', squash: 'racket', hyrox: 'hyrox', workout: 'dumbbell', other: 'spark', core: 'core', mobility: 'wave', posture: 'person', combi: 'core', gezin: 'family' };

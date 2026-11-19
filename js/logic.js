@@ -113,7 +113,7 @@ export function scoreValue(type, sc) {
 }
 export function scoreText(type, sc) {
   if (!sc) return '—';
-  if (type === 'amrap') return `${sc.rounds} rondes${sc.reps ? ` + ${sc.reps}` : ''}`;
+  if (type === 'amrap') return `${sc.rounds} ${sc.rounds === 1 ? 'ronde' : 'rondes'}${sc.reps ? ` + ${sc.reps}` : ''}`;
   if (type === 'fortime') return sc.capped ? `cap (${sc.progress || 0} rondes)` : fmtTime(sc.sec);
   if (type === 'emom') return `${sc.minutes}/${sc.of} min`;
   if (['interval', 'tabata', '4020'].includes(type)) return `${sc.reps} reps`;
