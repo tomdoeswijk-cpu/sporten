@@ -199,14 +199,6 @@ function viewVandaag() {
   const rr = reportReady();
   if (rr) qrow('spark', 'violet', `${monthName(rr).split(' ')[0].replace(/^./, (c) => c.toUpperCase())}-rapport staat klaar`, '', () => { ui.tab = 'voortgang'; ui.prog = 'maand'; ui.month = rr; go(); });
 
-  const sunday = d === 6, planWk = sunday ? L.addDays(L.weekKey(t), 7) : L.weekKey(t);
-  if (sunday) qrow('calendar', 'lime', L.planFor(planWk) ? 'Volgende week gepland' : 'Plan volgende week', L.planFor(planWk) ? 'Tik om aan te passen' : 'Terugblik en drie momenten kiezen', () => ritualSheet(planWk));
-  else if (!L.planFor()) qrow('calendar', 'lime', 'Plan je week', 'Drie sportmomenten kiezen', () => ritualSheet(L.weekKey(t)));
-  else {
-    const nx = L.nextPlanned();
-    if (nx) qrow('clock', 'lime', `${nx.date === t ? 'Vandaag' : `<span class="cap">${L.DAYS_LONG[nx.day]}</span>`} ${nx.time} · ${esc(nx.what)}`, 'Volgende sportmoment', () => ritualSheet(L.weekKey(t)));
-  }
-
   const rs = L.rescue();
   if (rs) {
     const need = [rs.need.sport && `${rs.need.sport} sport`, rs.need.core && `${rs.need.core} core`, rs.need.mob && `${rs.need.mob} mobility`].filter(Boolean).join(', ');
@@ -236,44 +228,6 @@ function viewVandaag() {
   });
   el.append(log);
   return el;
-}
-
-// ───────── ZONDAGRITUEEL ─────────
-function ritualSheet(wk) {
-  const st = store.get();
-  const prevWk = L.addDays(wk, -7);
-  const pw = L.weekStats(prevWk);
-  const existing = L.planFor(wk) || L.planFor(prevWk);
-  let slots = existing ? existing.slots.map((s) => ({ ...s })) : [{ day: 1, time: '21:00', what: 'Workout' }, { day: 3, time: '07:00', what: 'Hardlopen' }, { day: 5, time: '10:00', what: 'Squash' }];
-  const whats = ['Workout', 'Hardlopen', 'Racefiets', 'Squash', 'Hyrox', 'Gezin'];
-  const c = h(`<div class="sheet-body"></div>`);
-  let close;
-  const stepReview = () => {
-    const verdict = pw.allMet ? 'Alle doelen gehaald. Sterk.' : pw.sport + pw.core + pw.mob === 0 ? 'Een lege week. Gebeurt. Deze week begin je gewoon op nul, met een plan.' : 'Niet alles, wel iets. Kijk wat werkte en neem dat mee.';
-    c.innerHTML = `<div class="eyebrow">Stap 1/2 · Terugblik</div><h2>Week van ${L.fmtDate(prevWk)}</h2>
-      <div class="review"><div class="sport"><b>${pw.sport}</b>/3<small>sport</small></div><div class="core"><b>${pw.core}</b>/3<small>core</small></div><div class="mob"><b>${pw.mob}</b>/3<small>mobility</small></div></div>
-      <p>${verdict}</p><button class="btn primary" data-n>Volgende ›</button>`;
-    $('[data-n]', c).onclick = stepPlan;
-  };
-  const stepPlan = () => {
-    c.innerHTML = `<div class="eyebrow">Stap 2/2 · Plannen</div><h2>Jouw 3 sportmomenten</h2><p class="muted">Kies dag, tijd en wat.</p><div class="slots"></div>
-      <label class="field">Dagritueel-anker<input type="time" name="anchor" value="${st.settings.anchor}"><small>Een moment dat je toch elke dag hebt, bijv. na het tandenpoetsen.</small></label>
-      <button class="btn primary" data-n>Opslaan ›</button>`;
-    const box = $('.slots', c);
-    slots.forEach((s, i) => {
-      const row = h(`<div class="slot"><select name="day">${L.DAYS_LONG.map((dn, j) => `<option value="${j}" ${j === s.day ? 'selected' : ''}>${dn}</option>`).join('')}</select>
-        <input type="time" name="time" value="${s.time}"><select name="what">${whats.map((x) => `<option ${x === s.what ? 'selected' : ''}>${x}</option>`).join('')}</select></div>`);
-      row.onchange = () => { slots[i] = { day: Number($('[name=day]', row).value), time: $('[name=time]', row).value, what: $('[name=what]', row).value }; };
-      box.append(row);
-    });
-    $('[data-n]', c).onclick = async () => {
-      const anchor = $('[name=anchor]', c).value || '21:00';
-      await store.update((s2) => { s2.plans[wk] = { slots, made: Date.now() }; s2.settings.anchor = anchor; });
-      close(); render(); toast('Week gepland ✓');
-    };
-  };
-  stepReview();
-  close = sheet(c, { onClose: render });
 }
 
 // ───────── TURVEN ─────────
@@ -590,7 +544,6 @@ async function settingsSheet() {
   const st = store.get().settings;
   const persisted = await store.isPersisted();
   const c = h(`<div class="sheet-body"><h2>Instellingen</h2>
-    <label class="field">Dagritueel-anker<input type="time" name="anchor" value="${st.anchor}"></label>
     <div class="label">Standaardduur dagritueel</div><div class="chipset" data-rm>${[5, 10, 15].map((m) => `<button data-v="${m}" class="${m === st.ritualMin ? 'on' : ''}">${m} min</button>`).join('')}</div>
     <label class="field">Pull-ups achter elkaar (tot je eerste peilmoment)<input type="number" inputmode="numeric" name="pull" value="${st.pullLevel ?? 3}"><small>Onder de 5 gebruikt de app pull-ups met band.</small></label>
     <div class="label">Gegevens</div>
@@ -600,7 +553,6 @@ async function settingsSheet() {
     <button class="btn danger" data-reset>Alles wissen</button></div>
     <p class="small muted center">Ritme · gemaakt voor 3 sport, 3 core, 3 mobility per week.</p></div>`);
   const close = sheet(c, { onClose: render });
-  $('[name=anchor]', c).onchange = (e) => store.update((s) => { s.settings.anchor = e.target.value; });
   $('[name=pull]', c).onchange = (e) => store.update((s) => { s.settings.pullLevel = Number(e.target.value); });
   $('[data-rm]', c).onclick = (e) => { const v = Number(e.target.dataset.v); if (!v) return; store.update((s) => { s.settings.ritualMin = v; }); $('[data-rm]', c).querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === v)); };
   $('[data-exp]', c).onclick = doExport;

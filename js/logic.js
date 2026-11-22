@@ -62,17 +62,6 @@ export function pickRitual() {
 }
 export const daysLeft = () => 7 - dow(today()); // incl. vandaag
 
-// ── plan / zondagritueel ──
-export const planFor = (wk = weekKey(today())) => get().plans[wk];
-export function nextPlanned() {
-  const wk = weekKey(today()), p = planFor(wk);
-  if (!p) return null;
-  const t = today(), now = new Date(), hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  const doneDates = new Set(weekStats(wk).sessions.filter((x) => x.counts?.sport).map((x) => x.date));
-  const slots = p.slots.map((s) => ({ ...s, date: addDays(wk, s.day) })).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-  return slots.find((s) => !doneDates.has(s.date) && (s.date > t || (s.date === t && s.time >= hhmm))) || slots.find((s) => s.date === t && !doneDates.has(s.date)) || null;
-}
-
 // ── weekredder ──
 export function rescue() {
   const d = dow(today());
@@ -81,13 +70,10 @@ export function rescue() {
   const need = { sport: Math.max(0, GOALS.sport - w.sport), core: Math.max(0, GOALS.core - w.core), mob: Math.max(0, GOALS.mob - w.mob) };
   if (!need.sport && !need.core && !need.mob) return null;
   const route = [];
-  const p = planFor();
-  const plannedLeft = p ? p.slots.filter((s) => s.day >= d).sort((a, b) => a.day - b.day) : [];
   let sp = need.sport, c = need.core, m = need.mob;
   for (let i = 0; i < left; i++) {
     const day = d + i, parts = [];
-    const planned = plannedLeft.find((s) => s.day === day);
-    if (sp > 0 && (planned || left - i <= sp)) { parts.push(planned ? planned.what.toLowerCase() : 'workout'); sp--; }
+    if (sp > 0 && (i % 2 === 0 || left - i <= sp)) { parts.push('sporten'); sp--; }
     if (c > 0 && m > 0) { parts.push('combi-ritueel'); c--; m--; }
     else if (c > 0) { parts.push('core-ritueel'); c--; }
     else if (m > 0) { parts.push('mobility-ritueel'); m--; }

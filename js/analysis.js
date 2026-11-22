@@ -107,7 +107,6 @@ export const monthKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMo
 export const prevMonthKey = (key) => { const [y, m] = key.split('-').map(Number); return monthKey(new Date(y, m - 2, 1)); };
 export const nextMonthKey = (key) => { const [y, m] = key.split('-').map(Number); return monthKey(new Date(y, m, 1)); };
 export const monthName = (key) => { const [y, m] = key.split('-').map(Number); return `${MONTHS_LONG[m - 1]} ${y}`; };
-const part = (time) => { const hr = Number(time.split(':')[0]); return hr < 12 ? 'ochtend' : hr < 18 ? 'middag' : 'avond'; };
 
 function monthData(key) {
   const st = store.get(), t = L.today();
@@ -117,16 +116,6 @@ function monthData(key) {
   const [y, m] = key.split('-').map(Number);
   const first = L.iso(new Date(y, m - 1, 1)), last = L.iso(new Date(y, m, 0));
   for (let wk = L.weekKey(first); wk <= last; wk = L.addDays(wk, 7)) if (L.addDays(wk, 3).startsWith(key) && L.addDays(wk, 6) < t) weeks.push(L.weekStats(wk));
-  // planning
-  const slots = [];
-  for (const [wk, p] of Object.entries(st.plans)) for (const sl of p.slots || []) {
-    const date = L.addDays(wk, sl.day);
-    if (date.startsWith(key) && date < t) slots.push({ ...sl, date, done: st.sessions.some((x) => x.date === date && x.counts?.sport) });
-  }
-  const groups = {};
-  slots.forEach((sl) => { const dn = L.DAYS_LONG[sl.day]; const k = `${dn[0].toUpperCase()}${dn.slice(1)} ${part(sl.time)}`; (groups[k] ||= { k, n: 0, done: 0 }); groups[k].n++; if (sl.done) groups[k].done++; });
-  const plannedDates = new Set(slots.map((x) => x.date));
-  const unplanned = ss.filter((x) => x.counts?.sport && !plannedDates.has(x.date)).length;
   // wanneer sport je echt
   const dowCount = Array(7).fill(0);
   ss.filter((x) => x.counts?.sport).forEach((x) => dowCount[L.dow(x.date)]++);
@@ -147,21 +136,16 @@ function monthData(key) {
     key, ss, sport: sum('sport'), core: sum('core'), mob: sum('mob'),
     minutes: ss.reduce((a, b) => a + (b.minutes || 0), 0), active: new Set(ss.map((x) => x.date)).size,
     weeks, weeksMet: weeks.filter((w) => w.allMet).length, weeksSport: weeks.filter((w) => w.sport >= 3).length,
-    slots, groups: Object.values(groups).sort((a, b) => b.n - a.n), unplanned, dowCount, bdn, saverDays, rit, prs,
+    dowCount, bdn, saverDays, rit, prs,
   };
 }
 
 function suggestion(d) {
-  const g = d.groups.filter((x) => x.n >= 2);
-  const worst = [...g].sort((a, b) => a.done / a.n - b.done / b.n)[0];
-  const bestG = [...g].sort((a, b) => b.done / b.n - a.done / a.n)[0];
-  if (worst && bestG && worst !== bestG && worst.done / worst.n < 0.5) return `Je ${worst.k.toLowerCase()}-moment ging maar ${worst.done} van de ${worst.n} keer door, ${bestG.k.toLowerCase()} juist ${bestG.done} van de ${bestG.n}. Verschuif het zwakke moment naar een tijdstip dat al vaker lukt.`;
-  if (!d.slots.length && d.sport) return 'Je hebt deze maand niet gepland en toch gesport. Probeer volgende maand het zondagritueel: geplande momenten gaan vaker door dan losse voornemens.';
   if (d.mob < d.core * 0.6 && d.core >= 4) return 'Core loopt goed, mobility blijft achter. Zet je dagritueel een paar keer bewust op Mobility of kies vaker Combi.';
   if (d.core < d.mob * 0.6 && d.mob >= 4) return 'Mobility loopt goed, core blijft achter. Kies vaker Combi: dan haal je ze allebei in 10 minuten.';
-  if (d.weeks.length && d.weeksSport / d.weeks.length < 0.5) return 'Minder dan de helft van je weken haalde 3× sport. Kijk welk moment steeds sneuvelt en maak er een vaste "Beter dan niets, 3 rondes" van: die telt ook.';
-  if (d.weeks.length && d.weeksMet === d.weeks.length) return 'Elke week alle doelen. Houd vast wat werkt en verander niets aan je planning.';
-  return 'Houd het ritme vast. Kijk bij je zondagritueel naar de tabel "wanneer je plan doorgaat" en plan vooral op de momenten die al werken.';
+  if (d.weeks.length && d.weeksSport / d.weeks.length < 0.5) return 'Minder dan de helft van je weken haalde 3× sport. Kies een vaste dag die nu steeds sneuvelt en maak er een vaste "Beter dan niets, 3 rondes" van: die telt ook.';
+  if (d.weeks.length && d.weeksMet === d.weeks.length) return 'Elke week alle doelen. Houd vast wat werkt en verander niets aan je aanpak.';
+  return 'Houd het ritme vast. Kijk bij "Wanneer je echt sport" op welke dagen het lukt, en bouw daar je vaste momenten omheen.';
 }
 
 const delta = (a, b) => (b == null ? '' : a === b ? '<small class="eq">=</small>' : `<small class="${a > b ? 'up' : 'down'}">${a > b ? '▲' : '▼'} ${Math.abs(a - b)}</small>`);
@@ -187,14 +171,6 @@ export function monthReport(key, { onNav } = {}) {
 
   box.append(h(`<section class="card rep-tip">${icon('spark')}<div><div class="eyebrow">Eén ding voor volgende maand</div><p>${suggestion(d)}</p></div></section>`));
 
-  const pl = h(`<section class="card"><div class="card-h"><h3>Wanneer je plan doorgaat</h3><small>${d.slots.filter((x) => x.done).length}/${d.slots.length} gepland gehaald</small></div></section>`);
-  if (!d.groups.length) pl.append(h('<p class="muted small">Geen geplande momenten deze maand. Het zondagritueel vult deze tabel.</p>'));
-  d.groups.forEach((g) => {
-    const r = g.done / g.n;
-    pl.append(h(`<div class="rate"><span>${g.k}</span><div class="rbar"><i style="width:${Math.round(r * 100)}%" class="${r >= 0.75 ? 'hi' : r < 0.5 ? 'lo' : ''}"></i></div><b>${g.done}/${g.n}</b></div>`));
-  });
-  if (d.unplanned) pl.append(h(`<p class="small muted">Daarnaast ${d.unplanned} ongeplande sportmomenten.</p>`));
-  box.append(pl);
 
   const mx = Math.max(1, ...d.dowCount);
   box.append(h(`<section class="card"><div class="card-h"><h3>Wanneer je echt sport</h3><small>per weekdag</small></div>
