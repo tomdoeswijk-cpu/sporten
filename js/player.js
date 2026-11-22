@@ -426,7 +426,7 @@ export class Player {
     const ok = h(`<button class="btn primary">Opslaan ›</button>`);
     ok.onclick = () => { if (input.value !== '') this.tests.push({ test: s.test, value: Number(input.value) }); this.next(); };
     row.append(skip, ok); box.append(row);
-    this.shell(box, { phase: 'Peilsessie' });
+    this.shell(box, { phase: 'Begeleide test' });
   }
   r_photo() {
     const box = h(`<div class="p-col center"><h2>Houdingsfoto</h2>
@@ -436,7 +436,7 @@ export class Player {
     inp.onchange = () => { const f = inp.files[0]; if (!f) return; this.photo = f; box.querySelector('.p-photo').innerHTML = `<img src="${URL.createObjectURL(f)}" alt="">`; };
     const ok = h(`<button class="btn primary xl">Afronden ✓</button>`); ok.onclick = () => this.next();
     box.append(ok);
-    this.shell(box, { phase: 'Peilsessie' });
+    this.shell(box, { phase: 'Begeleide test' });
   }
 
   toast(msg) {

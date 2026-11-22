@@ -130,13 +130,13 @@ async function saveBDN(rounds, minutes) {
 }
 function startPeil() {
   new Player({
-    title: 'Peilsessie Kracht & Mobiliteit', plan: compilePeil(), onQuit: render,
+    title: 'Begeleide test', plan: compilePeil(), onQuit: render,
     onFinish: async (res) => {
       const date = L.today();
       await store.update((st) => { for (const t of res.tests) st.peil.push({ id: L.uid(), date, test: t.test, value: t.value }); });
       if (res.photo) await store.putPhoto(`posture-${date}`, res.photo);
-      const s = await addSession({ kind: 'peil', sport: 'workout', title: 'Peilsessie', minutes: res.minutes, refId: 'peil', counts: { sport: true } });
-      render(); doneSheet('Peilsessie klaar', s, `<p>${res.tests.length} tests vastgelegd${res.photo ? ' + houdingsfoto' : ''}.</p>`);
+      const s = await addSession({ kind: 'peil', sport: 'workout', title: 'Begeleide test', minutes: res.minutes, refId: 'peil', counts: { sport: true } });
+      render(); doneSheet('Test klaar', s, `<p>${res.tests.length} tests vastgelegd${res.photo ? ' + houdingsfoto' : ''}.</p>`);
     },
   });
 }
@@ -170,97 +170,70 @@ function weekNo(s) { const d = L.parse(s); d.setDate(d.getDate() + 3 - ((d.getDa
 function viewVandaag() {
   const st = store.get(), w = L.weekStats(), t = L.today(), d = L.dow(t);
   const el = h(`<div class="view"></div>`);
-  el.append(h(`<header class="hero"><div><small>${L.DAYS_LONG[d]} ${L.fmtDate(t).split(' ').slice(1).join(' ')}</small><h1>${greeting()}</h1></div><span class="wkpill">week ${weekNo(t)}</span></header>`));
+  el.append(h(`<header class="hero"><div><small>${L.DAYS_LONG[d]} ${L.fmtDate(t).split(' ').slice(1).join(' ')}</small><h1>${greeting()}</h1></div></header>`));
 
-  // Weekstand (hero)
-  const ad = L.activeDays(L.weekKey(t), L.addDays(L.weekKey(t), 6));
-  const row = (cls, label, n) => `<div class="wl-row ${cls} ${n >= 3 ? 'met' : ''}"><i></i><span>${label}</span><b>${n}<small>/3</small></b>${n >= 3 ? icon('check', 'ok') : ''}</div>`;
+  // Weekstand
+  const row = (cls, label, n) => `<div class="wl-row ${cls} ${n >= 3 ? 'met' : ''}"><i></i><span>${label}</span><b>${n}<small>/3</small></b>${n >= 3 ? icon('check', 'ok') : '<span></span>'}</div>`;
   el.append(h(`<section class="card weekhero"><div class="wh-top"><div class="wh-rings">${weekRings(w)}<div class="wh-c"><b>${w.sport + w.core + w.mob}</b><small>van 9</small></div></div>
-    <div class="wh-list">${row('sport', 'Sport', w.sport)}${row('core', 'Core', w.core)}${row('mob', 'Mobility', w.mob)}<p class="wh-meta">${w.minutes} min · ${ad} ${ad === 1 ? 'actieve dag' : 'actieve dagen'}</p></div></div>
-    ${dayStrip(w)}${w.allMet ? `<p class="win">${icon('trophy')} Alle doelen gehaald deze week</p>` : ''}</section>`));
+    <div class="wh-list">${row('sport', 'Sport', w.sport)}${row('core', 'Core', w.core)}${row('mob', 'Mobility', w.mob)}</div></div>
+    ${dayStrip(w)}</section>`));
 
-  const rr = reportReady();
-  if (rr) {
-    const b = h(`<button class="card irow report">${tile('spark', 'violet')}<div><b>Je ${monthName(rr).split(' ')[0]}-rapport staat klaar</b><span>Wanneer je plan doorging, wat werkte, en één ding voor deze maand.</span></div>${icon('arrow', 'go')}</button>`);
-    b.onclick = () => { ui.tab = 'voortgang'; ui.prog = 'maand'; ui.month = rr; go(); };
-    el.append(b);
-  }
-
-  const pi = L.peilInfo();
-  if (pi.isPeil) {
-    const b = h(`<button class="card irow peil">${tile('ruler', 'gold')}<div><b>Peilweek</b><span>Kracht-sessie, ${L.testById(pi.runTest).name.toLowerCase()} en 2 km roeien.</span></div>${icon('arrow', 'go')}</button>`);
-    b.onclick = () => { ui.tab = 'trainen'; ui.train.seg = 'peil'; go(); };
-    el.append(b);
-  }
-
-  // Zondagritueel / plan
-  const sunday = d === 6;
-  const planWk = sunday ? L.addDays(L.weekKey(t), 7) : L.weekKey(t);
-  if ((sunday && !L.planFor(planWk)) || !L.planFor()) {
-    const isSun = sunday && !L.planFor(planWk);
-    const b = h(`<button class="card ritual">${tile('calendar', 'lime')}<div class="eyebrow">${isSun ? 'Zondagritueel · 60 sec' : 'Deze week nog niet gepland'}</div><h3>${isSun ? 'Plan je volgende week' : 'Plan je 3 sportmomenten'}</h3><p>${isSun ? 'Terugblik, drie momenten kiezen, in je agenda. Klaar.' : 'Een beslissing nu = geen beslissing op de bank.'}</p><span class="cta">${isSun ? 'Start' : 'Plannen'} ${icon('arrow')}</span></button>`);
-    b.onclick = () => ritualSheet(isSun ? planWk : L.weekKey(t)); el.append(b);
-  } else {
-    const nx = L.nextPlanned();
-    if (nx) {
-      const isToday = nx.date === t;
-      const ic = { Workout: 'dumbbell', Hardlopen: 'run', Racefiets: 'bike', Squash: 'racket', Hyrox: 'hyrox', Gezin: 'family' }[nx.what] || 'clock';
-      const b = h(`<div class="card next ${isToday ? 'today' : ''}"><div class="next-top">${tile(ic, isToday ? 'lime solid' : 'lime')}<div><div class="eyebrow">${isToday ? 'Vandaag' : 'Volgende sportmoment'}</div>
-        <h3>${isToday ? '' : `<span class="cap">${L.DAYS_LONG[nx.day]}</span> `}${nx.time} · ${esc(nx.what)}</h3></div></div>
-        <p class="muted small">Lukt het niet? Dan doe je <b>Beter dan niets</b> vóór het slapen.</p>
-        <div class="row2"><button class="btn primary" data-go>${nx.what === 'Workout' ? 'Kies workout' : nx.what === 'Gezin' ? 'Kies gezinsworkout' : 'Turven'}</button><button class="btn ghost" data-plan>Plan aanpassen</button></div></div>`);
-      $('[data-go]', b).onclick = () => { if (nx.what === 'Workout') { ui.tab = 'trainen'; ui.train.seg = 'workouts'; go(); } else if (nx.what === 'Gezin') { ui.tab = 'trainen'; ui.train.seg = 'gezin'; go(); } else turfSheet(nx.what); };
-      $('[data-plan]', b).onclick = () => ritualSheet(L.weekKey(t));
-      el.append(b);
-    }
-  }
-
-  // Dagritueel
+  // Dagritueel — de hoofdactie van vandaag
   const r = L.pickRitual();
   const segCls = r.combi ? 'combi' : r.routine?.seg === 'core' ? 'core' : 'mob';
   const segLabel = r.combi ? 'Combi · telt dubbel' : r.bonus ? 'Bonus' : SEGMENTS[r.routine.seg].label;
   const name = r.combi ? `${r.core.name} + ${r.mob.name}` : r.routine.name;
   const firstEx = r.combi ? r.core.items[0] : r.routine.items[0];
-  const why = r.combi ? `Core ${3 - r.coreLeft}/3 en mobility ${3 - r.mobLeft}/3 — deze telt voor allebei.` : r.bonus ? 'Je doelen zijn binnen. Dit is extra.' : r.routine.seg === 'core' ? `Je staat op ${3 - r.coreLeft}/3 core.` : `Je staat op ${3 - r.mobLeft}/3 mobility.`;
-  const rit = h(`<section class="card daily ${segCls}"><div class="daily-main"><div><div class="eyebrow">Dagritueel · ${st.settings.anchor} · ${r.min} min</div>
-    <span class="tag ${segCls}">${segLabel}</span><h3>${esc(name)}</h3><p class="muted small">${r.doneToday ? 'Vandaag al gedaan ✓ · ' : ''}${why}</p></div><div class="daily-fig"></div></div>
-    <div class="row2"><button class="btn primary" data-start>${icon('play')} Start ritueel</button><button class="btn ghost" data-pick>Zelf kiezen</button></div></section>`);
+  const rit = h(`<section class="card daily ${segCls}"><div class="daily-main"><div><div class="eyebrow"><span class="dotc"></span>${segLabel} · ${r.min} min</div>
+    <h3>${esc(name)}</h3>${r.doneToday ? '<p class="muted small">Vandaag al gedaan ✓</p>' : ''}</div><div class="daily-fig"></div></div>
+    <button class="btn primary wide" data-start>${icon('play')} Start dagritueel</button><button class="link" data-pick>Andere routine kiezen</button></section>`);
   $('.daily-fig', rit).append(figure(EX[firstEx]));
   $('[data-start]', rit).onclick = () => (r.combi ? startCombi(r.core, r.mob) : startRoutine(r.routine, r.min));
   $('[data-pick]', rit).onclick = () => { ui.tab = 'trainen'; ui.train.seg = 'routines'; go(); };
   el.append(rit);
 
-  // Beter dan niets
-  const bdn = h(`<button class="card irow bdn">${tile('bolt', 'neutral')}<div><b>Echt geen zin?</b><span>Zonnegroet, 10 push-ups, 10 squats. 3 minuten.</span></div><span class="go-pill">Go</span></button>`);
-  bdn.onclick = () => startBDN(); el.append(bdn);
+  // Rustige lijst met wat er verder speelt
+  const rows = [];
+  const qrow = (ic, cls, title, sub, fn) => { const b = h(`<button class="qrow"><span class="qic ${cls}">${icon(ic)}</span><span class="qt"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</span><span class="chev">›</span></button>`); b.onclick = fn; rows.push(b); };
 
-  // Weekredder
+  const rr = reportReady();
+  if (rr) qrow('spark', 'violet', `${monthName(rr).split(' ')[0].replace(/^./, (c) => c.toUpperCase())}-rapport staat klaar`, '', () => { ui.tab = 'voortgang'; ui.prog = 'maand'; ui.month = rr; go(); });
+
+  const sunday = d === 6, planWk = sunday ? L.addDays(L.weekKey(t), 7) : L.weekKey(t);
+  if (sunday) qrow('calendar', 'lime', L.planFor(planWk) ? 'Volgende week gepland' : 'Plan volgende week', L.planFor(planWk) ? 'Tik om aan te passen' : 'Terugblik en drie momenten kiezen', () => ritualSheet(planWk));
+  else if (!L.planFor()) qrow('calendar', 'lime', 'Plan je week', 'Drie sportmomenten kiezen', () => ritualSheet(L.weekKey(t)));
+  else {
+    const nx = L.nextPlanned();
+    if (nx) qrow('clock', 'lime', `${nx.date === t ? 'Vandaag' : `<span class="cap">${L.DAYS_LONG[nx.day]}</span>`} ${nx.time} · ${esc(nx.what)}`, 'Volgende sportmoment', () => ritualSheet(L.weekKey(t)));
+  }
+
   const rs = L.rescue();
   if (rs) {
-    const need = [rs.need.sport && `${rs.need.sport} sport`, rs.need.core && `${rs.need.core} core`, rs.need.mob && `${rs.need.mob} mobility`].filter(Boolean).join(' · ');
-    el.append(h(`<section class="card rescue"><div class="next-top">${tile('shield', 'coral')}<div><div class="eyebrow">Week redden · nog ${rs.left} ${rs.left === 1 ? 'dag' : 'dagen'}</div><h3>${need}</h3></div></div>
-      <p class="muted small">${rs.feasible ? 'Zo haal je het:' : 'Alles halen wordt krap, maar dit is de beste route:'}</p>
-      <ol class="route">${rs.route.map((x) => `<li><b>${L.DAYS_LONG[x.day]}</b><span>${x.parts.join(' + ')}</span></li>`).join('')}</ol></section>`));
+    const need = [rs.need.sport && `${rs.need.sport} sport`, rs.need.core && `${rs.need.core} core`, rs.need.mob && `${rs.need.mob} mobility`].filter(Boolean).join(', ');
+    qrow('shield', 'coral', 'Week redden', `Nog ${need} in ${rs.left} ${rs.left === 1 ? 'dag' : 'dagen'}`, () => {
+      const c = h(`<div class="sheet-body"><h2>Week redden</h2><p class="muted">${rs.feasible ? 'Zo haal je het nog:' : 'Alles halen wordt krap, dit is de beste route:'}</p>
+        <ol class="route">${rs.route.map((x) => `<li><b>${L.DAYS_LONG[x.day]}</b><span>${x.parts.join(' + ')}</span></li>`).join('')}</ol><button class="btn ghost" data-close>Sluiten</button></div>`);
+      const close = sheet(c); $('[data-close]', c).onclick = close;
+    });
   }
 
-  // Back-up herinnering
+  qrow('bolt', 'neutral', 'Beter dan niets', 'Zonnegroet, 10 push-ups, 10 squats', () => startBDN());
+
   const lb = st.settings.lastBackup;
-  if (st.sessions.length >= 3 && (!lb || Date.now() - lb > 30 * 864e5) && (d === 6 || !lb)) {
-    const b = h(`<button class="card irow backup">${tile('cloud', 'cyan')}<div><b>Back-up maken</b><span>${lb ? 'Je laatste back-up is meer dan een maand oud.' : 'Je hebt nog geen back-up.'} Eén tik.</span></div>${icon('arrow', 'go')}</button>`);
-    b.onclick = doExport; el.append(b);
-  }
+  if (st.sessions.length >= 3 && (!lb || Date.now() - lb > 30 * 864e5) && (d === 6 || !lb)) qrow('cloud', 'cyan', 'Back-up maken', lb ? 'Laatste is ouder dan een maand' : 'Nog nooit gedaan', doExport);
+
+  const ql = h(`<section class="card qlist"></section>`); rows.forEach((x) => ql.append(x)); el.append(ql);
 
   // Log deze week
-  const log = h(`<section class="card log"><div class="card-h"><h3>Gelogd deze week</h3><button class="btn small" data-turf>${icon('plus')} Turven</button></div></section>`);
-  if (!w.sessions.length) log.append(h(`<p class="muted small">Nog niks. De eerste is altijd de moeilijkste.</p>`));
+  const log = h(`<section class="log"><div class="label pad">Deze week</div></section>`);
+  if (!w.sessions.length) log.append(h(`<p class="muted small pad">Nog niks gelogd. Tik op + om te turven.</p>`));
   [...w.sessions].reverse().forEach((s) => {
     const cls = s.counts?.sport ? 'lime' : s.counts?.core && s.counts?.mob ? 'combi' : s.counts?.core ? 'coral' : s.counts?.mob ? 'cyan' : 'neutral';
     const ic = s.kind === 'bdn' ? 'bolt' : s.kind === 'peil' ? 'ruler' : s.kind === 'gezin' ? 'family' : sportIcon[s.sport] || 'spark';
-    const row = h(`<div class="log-row">${tile(ic, cls)}<div><b>${esc(s.title)}</b><small>${L.fmtDate(s.date)} · ${s.minutes} min${s.km ? ` · ${s.km} km` : ''}</small></div><div class="chips">${goalChips(s.counts)}</div><button class="x" aria-label="Verwijderen">✕</button></div>`);
+    const row = h(`<div class="log-row"><span class="qic ${cls}">${icon(ic)}</span><div><b>${esc(s.title)}</b><small>${L.DAYS_LONG[L.dow(s.date)]} · ${s.minutes} min${s.km ? ` · ${s.km} km` : ''}</small></div><button class="x" aria-label="Verwijderen">✕</button></div>`);
     $('.x', row).onclick = async () => { if (confirm(`"${s.title}" verwijderen?`)) { await store.update((st2) => { st2.sessions = st2.sessions.filter((x) => x.id !== s.id); }); render(); } };
     log.append(row);
   });
-  $('[data-turf]', log).onclick = () => turfSheet();
   el.append(log);
   return el;
 }
@@ -277,13 +250,13 @@ function ritualSheet(wk) {
   let close;
   const stepReview = () => {
     const verdict = pw.allMet ? 'Alle doelen gehaald. Sterk.' : pw.sport + pw.core + pw.mob === 0 ? 'Een lege week. Gebeurt. Deze week begin je gewoon op nul, met een plan.' : 'Niet alles, wel iets. Kijk wat werkte en neem dat mee.';
-    c.innerHTML = `<div class="eyebrow">Stap 1/3 · Terugblik</div><h2>Week van ${L.fmtDate(prevWk)}</h2>
+    c.innerHTML = `<div class="eyebrow">Stap 1/2 · Terugblik</div><h2>Week van ${L.fmtDate(prevWk)}</h2>
       <div class="review"><div class="sport"><b>${pw.sport}</b>/3<small>sport</small></div><div class="core"><b>${pw.core}</b>/3<small>core</small></div><div class="mob"><b>${pw.mob}</b>/3<small>mobility</small></div></div>
       <p>${verdict}</p><button class="btn primary" data-n>Volgende ›</button>`;
     $('[data-n]', c).onclick = stepPlan;
   };
   const stepPlan = () => {
-    c.innerHTML = `<div class="eyebrow">Stap 2/3 · Plannen</div><h2>Jouw 3 sportmomenten</h2><p class="muted">Kies dag, tijd en wat. Je uitwijkplan is altijd: Beter dan niets.</p><div class="slots"></div>
+    c.innerHTML = `<div class="eyebrow">Stap 2/2 · Plannen</div><h2>Jouw 3 sportmomenten</h2><p class="muted">Kies dag, tijd en wat.</p><div class="slots"></div>
       <label class="field">Dagritueel-anker<input type="time" name="anchor" value="${st.settings.anchor}"><small>Een moment dat je toch elke dag hebt, bijv. na het tandenpoetsen.</small></label>
       <button class="btn primary" data-n>Opslaan ›</button>`;
     const box = $('.slots', c);
@@ -295,27 +268,9 @@ function ritualSheet(wk) {
     });
     $('[data-n]', c).onclick = async () => {
       const anchor = $('[name=anchor]', c).value || '21:00';
-      const anchorChanged = anchor !== st.settings.anchor;
-      await store.update((s2) => { s2.plans[wk] = { slots, made: Date.now() }; s2.settings.anchor = anchor; if (anchorChanged) s2.settings.anchorCal = false; });
-      stepCal();
+      await store.update((s2) => { s2.plans[wk] = { slots, made: Date.now() }; s2.settings.anchor = anchor; });
+      close(); render(); toast('Week gepland ✓');
     };
-  };
-  const stepCal = () => {
-    const s2 = store.get();
-    c.innerHTML = `<div class="eyebrow">Stap 3/3 · Agenda</div><h2>Zet het in je agenda</h2><p class="muted">Je agenda is je herinnering. Tik per moment op "Toevoegen" en sla op in Google Agenda.</p><div class="cal"></div><button class="btn primary" data-n>Klaar</button>`;
-    const cal = $('.cal', c);
-    [...slots].sort((a, b) => a.day - b.day).forEach((s) => {
-      const date = L.addDays(wk, s.day);
-      const url = L.calLink({ title: `Ritme: ${s.what}`, date, time: s.time, minutes: s.what === 'Squash' ? 60 : 45, details: 'Lukt het niet? Beter dan niets vóór het slapen. — Ritme' });
-      cal.append(h(`<a class="cal-row" href="${url}" target="_blank" rel="noopener"><span><b>${L.DAYS_LONG[s.day]} ${s.time}</b> ${s.what}</span><span class="cta">Toevoegen ›</span></a>`));
-    });
-    if (!s2.settings.anchorCal) {
-      const url = L.calLink({ title: 'Ritme: dagritueel (10 min)', date: L.today(), time: s2.settings.anchor, minutes: 10, details: 'Core / mobility / posture — open Ritme, de app kiest voor je.', daily: true });
-      const a = h(`<a class="cal-row daily" href="${url}" target="_blank" rel="noopener"><span><b>Elke dag ${s2.settings.anchor}</b> dagritueel</span><span class="cta">Toevoegen ›</span></a>`);
-      a.onclick = () => store.update((x) => { x.settings.anchorCal = true; });
-      cal.append(a);
-    }
-    $('[data-n]', c).onclick = () => { close(); render(); toast('Week gepland ✓'); };
   };
   stepReview();
   close = sheet(c, { onClose: render });
@@ -331,7 +286,6 @@ function turfSheet(preset) {
     <div class="label">Duur (minuten)</div><div class="chipset" data-min>${[20, 30, 45, 60, 75, 90, 120].map((m) => `<button data-v="${m}">${m}</button>`).join('')}</div>
     <input type="number" inputmode="numeric" name="min" value="45" class="minput">
     <div class="km" hidden><div class="label">Afstand (km, optioneel)</div><input type="number" inputmode="decimal" step="0.1" name="km" placeholder="bijv. 10"></div>
-    <div class="peilq" hidden><label class="check"><input type="checkbox" name="peil"> Opslaan als peilmoment</label><input name="time" placeholder="tijd mm:ss of u:mm:ss" inputmode="numeric"></div>
     <div class="label">Wanneer</div><div class="chipset" data-date><button data-v="0">Vandaag</button><button data-v="-1">Gisteren</button><button data-v="-2">Eergisteren</button></div>
     <button class="btn primary xl" data-save>Opslaan</button></div>`);
   const sel = (set, v) => set.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === String(v)));
@@ -340,24 +294,16 @@ function turfSheet(preset) {
     sel(S, sport); sel(M, min); sel(D, Math.round((L.parse(date) - L.parse(L.today())) / 864e5));
     $('.km', c).hidden = !SPORTS.find((s) => s.id === sport)?.km;
     $('.other', c).hidden = sport !== 'other';
-    const km = Number($('[name=km]', c).value);
-    $('.peilq', c).hidden = !(sport === 'run' && (Math.abs(km - 5) < 0.2 || Math.abs(km - 10) < 0.3));
   };
   S.onclick = (e) => { if (e.target.dataset.v) { sport = e.target.dataset.v; upd(); } };
   M.onclick = (e) => { if (e.target.dataset.v) { min = Number(e.target.dataset.v); $('[name=min]', c).value = min; upd(); } };
   D.onclick = (e) => { if (e.target.dataset.v) { date = L.addDays(L.today(), Number(e.target.dataset.v)); upd(); } };
   $('[name=min]', c).oninput = (e) => { min = Number(e.target.value); upd(); };
-  $('[name=km]', c).oninput = upd;
   $('[data-save]', c).onclick = async () => {
     const sp = SPORTS.find((s) => s.id === sport);
     const km = Number($('[name=km]', c).value) || null;
     const title = sport === 'other' ? ($('[name=otherName]', c).value || 'Overig') : sp.label;
     await addSession({ kind: 'sport', sport, title, minutes: min || 0, km, date, counts: { sport: true } });
-    if ($('[name=peil]', c).checked) {
-      const parts = $('[name=time]', c).value.split(':').map(Number);
-      const sec = parts.reduce((a, b) => a * 60 + b, 0);
-      if (sec > 0) await store.update((st) => st.peil.push({ id: L.uid(), date, test: Math.abs(km - 5) < 0.2 ? 'run5' : 'run10', value: sec }));
-    }
     close(); render(); toast(`${title} geturfd ✓`);
   };
   upd();
@@ -402,7 +348,7 @@ function workoutCard(w, suggested) {
   const tl = w.type === 'gezin' ? 'Gezin' : TYPES[w.type].label;
   const card = h(`<button class="card wcard t-${w.type}"><div class="wc-head"><span class="wtype">${tl}</span><span class="wdur">${icon('clock')}${w.dur} min</span>${suggested ? '<span class="sugg">Voorstel</span>' : ''}</div>
     <h3>${esc(w.name)}</h3><div data-th></div><p class="muted small">${summary(w)}</p>
-    <div class="wmeta">${done.length ? `<span>${done.length}× gedaan · laatst ${L.fmtDate(done.at(-1).date)}</span>` : '<span>Nog niet gedaan</span>'}${b ? `<span class="prb">${icon('trophy')} ${L.scoreText(st, b.s.score)}</span>` : ''}</div></button>`);
+    ${done.length ? `<div class="wmeta"><span>${done.length}× gedaan · laatst ${L.fmtDate(done.at(-1).date)}</span>${b ? `<span class="prb">${icon('trophy')} ${L.scoreText(st, b.s.score)}</span>` : ''}</div>` : ''}</button>`);
   $('[data-th]', card).replaceWith(thumbs(workoutExIds(w)));
   card.onclick = () => workoutDetail(w);
   return card;
@@ -413,7 +359,7 @@ function routineCard(r, min, suggested, mob) {
   const cls = mob ? 'combi' : r.seg;
   const card = h(`<button class="card wcard t-${cls}"><div class="wc-head"><span class="wtype">${mob ? 'Combi' : SEGMENTS[r.seg].label}</span><span class="wdur">${icon('clock')}${mob ? 10 : min} min</span>${suggested ? '<span class="sugg">Voorstel</span>' : ''}</div>
     <h3>${mob ? `${r.name} + ${mob.name}` : r.name}</h3><div data-th></div><p class="muted small">${[...new Set(items)].slice(0, 10).map((x) => EX[x].name).join(' · ')}</p>
-    <div class="wmeta"><span>${done.length ? `${done.length}× gedaan` : 'Nog niet gedaan'}</span>${mob ? '<span class="dbl">telt dubbel</span>' : ''}</div></button>`);
+    ${done.length || mob ? `<div class="wmeta"><span>${done.length ? `${done.length}× gedaan` : ''}</span>${mob ? '<span class="dbl">telt dubbel</span>' : ''}</div>` : ''}</button>`);
   $('[data-th]', card).replaceWith(thumbs([...new Set(items)], 6));
   card.onclick = () => routineDetail(r, mob ? 10 : min, mob);
   return card;
@@ -462,8 +408,9 @@ function routineDetail(r, min, combiMob) {
 
 function viewTrainen() {
   const T = ui.train;
+  if (!['workouts', 'routines', 'gezin', 'lib'].includes(T.seg)) T.seg = 'workouts';
   const el = h(`<div class="view"><header class="hero"><h1>Trainen</h1></header></div>`);
-  el.append(seg([['workouts', 'Workouts'], ['routines', 'Routines'], ['gezin', 'Gezin'], ['peil', 'Peil'], ['lib', 'Oefeningen']], T.seg, (v) => { T.seg = v; saveUi(); go(); }, 'tabs'));
+  el.append(seg([['workouts', 'Workouts'], ['routines', 'Routines'], ['gezin', 'Gezin'], ['lib', 'Oefeningen']], T.seg, (v) => { T.seg = v; saveUi(); go(); }, 'tabs'));
 
   if (T.seg === 'workouts') {
     el.append(seg(Object.entries(TYPES).map(([k, v]) => [k, v.label]), T.type, (v) => { T.type = v; if (!TYPES[v].durs.includes(Number(T.dur))) T.dur = TYPES[v].durs[1]; saveUi(); go(); }));
@@ -496,7 +443,6 @@ function viewTrainen() {
     el.append(h(`<p class="muted pad">Sporten mét je dochters in plaats van ondanks. Telt als sportmoment.</p>`));
     FAMILY.forEach((f) => { const card = workoutCard({ ...f, type: 'gezin' }); card.querySelector('h3').insertAdjacentHTML('afterend', `<p class="fam">${f.uitleg}</p>`); el.append(card); });
   }
-  if (T.seg === 'peil') el.append(peilView());
   if (T.seg === 'lib') {
     const groups = [['duwen', 'Duwen'], ['trekken', 'Trekken'], ['benen', 'Benen & heup'], ['core', 'Core'], ['conditie', 'Conditie'], ['mobility', 'Mobility'], ['posture', 'Posture'], ['warmup', 'Warming-up'], ['gezin', 'Gezin'], ['peil', 'Peil']];
     for (const [k, l] of groups) {
@@ -509,35 +455,85 @@ function viewTrainen() {
   return el;
 }
 
-function peilView() {
-  const pi = L.peilInfo();
-  const box = h(`<div></div>`);
-  box.append(h(`<div class="card ${pi.isPeil ? 'banner peil' : ''}"><h3>${pi.isPeil ? 'Het is peilweek!' : `Volgende peilweek over ${pi.nextIn} ${pi.nextIn === 1 ? 'week' : 'weken'}`}</h3>
-    <p class="muted">Elke 6 weken. Deze ronde: ${L.testById(pi.runTest).name}. De app markeert wat aan de beurt is, maar je kiest zelf.</p></div>`));
-  const k = h(`<button class="card wcard t-peil"><div class="wc-head"><span class="wtype">Peil</span><span class="wdur">${icon('clock')}25 min</span><span class="sugg">${pi.isPeil ? 'Aan de beurt' : 'Kan altijd'}</span></div><h3>Peilsessie Kracht & Mobiliteit</h3><p class="muted">±25 min begeleid: push-ups, pull-ups, dead hang, verspringen, Bulgarian per been, hollow hold, knee-to-wall, squat hold + houdingsfoto.</p></button>`);
-  k.onclick = startPeil; box.append(k);
-  const cond = h(`<div class="card"><h3>Peilsessie Conditie</h3><p class="muted">Hardlopen buiten (of turf je loop van 5/10 km met tijd) en 2 km op de roeier. Vul je tijd in:</p></div>`);
-  ['run5', 'run10', 'row2k'].forEach((id) => {
-    const t = L.testById(id);
-    const due = (id === pi.runTest || id === 'row2k') && pi.isPeil;
-    const row = h(`<div class="trow">${due ? '<span class="dot"></span>' : ''}<span>${t.name}</span><input placeholder="mm:ss" inputmode="numeric"><button class="btn small">+</button></div>`);
-    $('button', row).onclick = async () => {
-      const sec = $('input', row).value.split(':').map(Number).reduce((a, b) => a * 60 + b, 0);
-      if (!sec) return;
-      await store.update((st) => st.peil.push({ id: L.uid(), date: L.today(), test: id, value: sec }));
-      toast(`${t.name}: ${L.fmtTime(sec)} opgeslagen`); go();
-    };
-    cond.append(row);
-  });
-  box.append(cond);
-  const all = h(`<div class="card"><h3>Alle tests</h3></div>`);
-  TESTS.forEach((t) => {
-    const s = L.testSeries(t.id), b = L.testBest(t.id);
-    all.append(h(`<div class="trow"><span>${t.name}</span><span class="muted">${s.length ? `laatst ${L.fmtTest(t, s.at(-1).value)}` : '—'}</span><b>${b ? L.fmtTest(t, b.value) : ''}</b></div>`));
-  });
-  all.append(h(`<p class="small muted">Trends en foto's vind je bij Voortgang › Peil.</p>`));
-  box.append(all);
+// ───────── PEIL ─────────
+const TEST_GROUPS = [...new Set(TESTS.map((t) => t.group))];
+function peilPanel() {
+  const box = h(`<div class="stackv"></div>`);
+  const act = h(`<div class="row2"><button class="btn primary" data-log>${icon('plus')} Meting loggen</button><button class="btn ghost" data-sess>Begeleide test</button></div>`);
+  $('[data-log]', act).onclick = () => peilLogSheet();
+  $('[data-sess]', act).onclick = () => {
+    const c = h(`<div class="sheet-body"><h2>Begeleide test</h2><p class="muted">±25 minuten. De app leidt je langs push-ups, pull-ups, dead hang, verspringen, Bulgarian per been, hollow hold, knee-to-wall en squat hold, en sluit af met een houdingsfoto. Na elke test vul je je score in.</p><button class="btn primary" data-go>${icon('play')} Start</button></div>`);
+    const close = sheet(c); $('[data-go]', c).onclick = () => { close(); startPeil(); };
+  };
+  box.append(act);
+  const v = C.peilView();
+  v.addEventListener('click', (e) => { const r = e.target.closest('[data-test]'); if (r) peilTestSheet(r.dataset.test); });
+  box.append(v);
   return box;
+}
+// Tijd invoeren met losse velden: werkt op elk numeriek toetsenbord (geen dubbele punt nodig)
+function valueInput(t, v) {
+  if (t.unit === 'time') {
+    const hh = v ? Math.floor(v / 3600) : '', mm = v ? Math.floor((v % 3600) / 60) : '', ss = v ? v % 60 : '';
+    return `<div class="tin">${t.id === 'run10' ? `<label><input type="number" inputmode="numeric" name="h" min="0" value="${hh || ''}" placeholder="0"><small>uur</small></label>` : ''}<label><input type="number" inputmode="numeric" name="m" min="0" value="${mm}" placeholder="0"><small>min</small></label><label><input type="number" inputmode="numeric" name="s" min="0" max="59" value="${ss}" placeholder="0"><small>sec</small></label></div>`;
+  }
+  const unit = { reps: 'herhalingen', sec: 'seconden', cm: 'cm' }[t.unit];
+  return `<div class="tin one"><label><input type="number" inputmode="decimal" name="v" min="0" value="${v ?? ''}" placeholder="0"><small>${unit}</small></label></div>`;
+}
+function readValue(t, c) {
+  const n = (name) => Number($(`[name=${name}]`, c)?.value || 0);
+  if (t.unit === 'time') { if (n('s') > 59) return null; return n('h') * 3600 + n('m') * 60 + n('s'); }
+  return n('v');
+}
+function peilLogSheet(testId, onDone) {
+  let test = testId || store.get().settings.lastTest || 'pushups';
+  if (!L.testById(test)) test = 'pushups';
+  const c = h(`<div class="sheet-body"><h2>Meting loggen</h2>
+    <div class="label">Test</div><div class="tests">${TEST_GROUPS.map((g) => `<div class="tg"><small>${g}</small><div class="chipset">${TESTS.filter((t) => t.group === g).map((t) => `<button data-v="${t.id}">${t.name.replace('Bulgarian split squat', 'Bulgarian')}</button>`).join('')}</div></div>`).join('')}</div>
+    <p class="how small muted"></p>
+    <div class="label">Resultaat</div><div data-val></div>
+    <label class="field">Datum<input type="date" name="date" value="${L.today()}" max="${L.today()}"></label>
+    <p class="err" hidden></p>
+    <button class="btn primary xl" data-save>Opslaan</button></div>`);
+  const upd = () => {
+    c.querySelectorAll('.tests button').forEach((b) => b.classList.toggle('on', b.dataset.v === test));
+    const t = L.testById(test);
+    $('.how', c).textContent = t.how;
+    $('[data-val]', c).innerHTML = valueInput(t);
+  };
+  $('.tests', c).onclick = (e) => { const b = e.target.closest('button'); if (b) { test = b.dataset.v; upd(); } };
+  $('[data-save]', c).onclick = async () => {
+    const t = L.testById(test), v = readValue(t, c), date = $('[name=date]', c).value || L.today();
+    const err = $('.err', c);
+    if (v == null || !(v > 0)) { err.hidden = false; err.textContent = t.unit === 'time' ? 'Vul een geldige tijd in (seconden 0–59).' : 'Vul een waarde groter dan 0 in.'; return; }
+    await store.update((st) => { st.peil.push({ id: L.uid(), date, test, value: v }); st.settings.lastTest = test; });
+    close(); ui.tab = 'voortgang'; ui.prog = 'peil'; go(); toast(`${t.name}: ${L.fmtTest(t, v)} opgeslagen`);
+    onDone?.();
+  };
+  upd();
+  const close = sheet(c);
+}
+function peilTestSheet(id) {
+  const t = L.testById(id);
+  const c = h(`<div class="sheet-body"><div class="eyebrow">${t.group}</div><h2>${t.name}</h2><p class="small muted">${t.how}</p><div data-chart></div><div class="label">Metingen</div><div class="hist edit"></div>
+    <button class="btn primary" data-add>${icon('plus')} Nieuwe meting</button></div>`);
+  const list = () => {
+    const box = $('.hist', c), ser = L.testSeries(id), s = [...ser].reverse(), best = L.testBest(id);
+    $('[data-chart]', c).innerHTML = ser.length > 1 ? C.lineChart(t, ser) : '';
+    box.innerHTML = s.length ? '' : '<p class="muted small">Geen metingen meer.</p>';
+    s.forEach((x) => {
+      const r = h(`<div><span>${L.fmtDate(x.date)}</span><b>${L.fmtTest(t, x.value)}${best && x.id === best.id ? ` <em class="prb">${icon('trophy')}</em>` : ''}</b><button class="x" aria-label="Verwijderen">✕</button></div>`);
+      $('.x', r).onclick = async () => {
+        if (!confirm(`Meting van ${L.fmtDate(x.date)} (${L.fmtTest(t, x.value)}) verwijderen?`)) return;
+        await store.update((st) => { st.peil = st.peil.filter((p) => p.id !== x.id); });
+        list(); render(); toast('Meting verwijderd');
+      };
+      box.append(r);
+    });
+  };
+  list();
+  const close = sheet(c);
+  $('[data-add]', c).onclick = () => { close(); peilLogSheet(id); };
 }
 
 // ───────── VOORTGANG ─────────
@@ -575,7 +571,7 @@ function viewVoortgang() {
     });
     el.append(v);
   }
-  if (ui.prog === 'peil') el.append(C.peilView());
+  if (ui.prog === 'peil') el.append(peilPanel());
   return el;
 }
 
@@ -604,7 +600,7 @@ async function settingsSheet() {
     <button class="btn danger" data-reset>Alles wissen</button></div>
     <p class="small muted center">Ritme · gemaakt voor 3 sport, 3 core, 3 mobility per week.</p></div>`);
   const close = sheet(c, { onClose: render });
-  $('[name=anchor]', c).onchange = (e) => store.update((s) => { s.settings.anchor = e.target.value; s.settings.anchorCal = false; });
+  $('[name=anchor]', c).onchange = (e) => store.update((s) => { s.settings.anchor = e.target.value; });
   $('[name=pull]', c).onchange = (e) => store.update((s) => { s.settings.pullLevel = Number(e.target.value); });
   $('[data-rm]', c).onclick = (e) => { const v = Number(e.target.dataset.v); if (!v) return; store.update((s) => { s.settings.ritualMin = v; }); $('[data-rm]', c).querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === v)); };
   $('[data-exp]', c).onclick = doExport;

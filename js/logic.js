@@ -155,15 +155,6 @@ export function pullVariant() {
 }
 export const resolveEx = (id) => (id === 'pullup*' ? pullVariant() : id);
 
-// ── peilweek: elke 6 weken vanaf startdatum ──
-export function peilInfo() {
-  const start = monday(get().settings.start || today());
-  const weeks = Math.floor((parse(weekKey(today())) - parse(start)) / (7 * 864e5));
-  const isPeil = weeks % 6 === 0;
-  const nextIn = isPeil ? 0 : 6 - (weeks % 6);
-  const round = Math.floor(weeks / 6);
-  return { isPeil, nextIn, round, runTest: round % 2 === 0 ? 'run5' : 'run10', nextWeek: addDays(weekKey(today()), nextIn * 7) };
-}
 export const testById = (id) => TESTS.find((t) => t.id === id);
 export function testSeries(id) { return get().peil.filter((x) => x.test === id).sort((a, b) => a.date.localeCompare(b.date)); }
 export function testBest(id) {
@@ -173,18 +164,3 @@ export function testBest(id) {
 }
 export const fmtTest = (t, v) => (v == null ? '—' : t.unit === 'time' ? fmtTime(v) : t.unit === 'sec' ? `${v} s` : t.unit === 'cm' ? `${v} cm` : `${v}`);
 
-// ── agenda-links (Google Agenda) ──
-const calStamp = (date, time) => date.replace(/-/g, '') + 'T' + time.replace(':', '') + '00';
-export function calLink({ title, date, time, minutes = 30, details = '', daily = false }) {
-  const [h, m] = time.split(':').map(Number);
-  const endMin = h * 60 + m + minutes;
-  const endTime = `${String(Math.floor(endMin / 60) % 24).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
-  const u = new URL('https://calendar.google.com/calendar/render');
-  u.searchParams.set('action', 'TEMPLATE');
-  u.searchParams.set('text', title);
-  u.searchParams.set('dates', `${calStamp(date, time)}/${calStamp(date, endTime)}`);
-  u.searchParams.set('ctz', 'Europe/Amsterdam');
-  if (details) u.searchParams.set('details', details);
-  if (daily) u.searchParams.set('recur', 'RRULE:FREQ=DAILY');
-  return u.toString();
-}

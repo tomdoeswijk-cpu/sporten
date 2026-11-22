@@ -170,7 +170,7 @@ export function prView() {
 }
 
 // ───────── PEIL ─────────
-function lineChart(t, series) {
+export function lineChart(t, series) {
   const W = 320, H = 130, pl = 40, pb = 20, pt = 12;
   const vals = series.map((s) => s.value);
   let mn = Math.min(...vals), mx = Math.max(...vals);
@@ -197,20 +197,22 @@ export function peilView() {
     if (!ts.length) continue;
     any = true;
     box.append(h(`<div class="label pad">${g}</div>`));
+    const card = h(`<section class="card plist"></section>`);
     ts.forEach((t) => {
-      const s = L.testSeries(t.id), b = L.testBest(t.id), first = s[0], last = s.at(-1);
+      const s = L.testSeries(t.id), first = s[0], last = s.at(-1);
       const diff = last.value - first.value;
       const better = t.better === 'lo' ? diff < 0 : diff > 0;
-      const dtxt = s.length > 1 && diff !== 0 ? `<span class="${better ? 'up' : 'down'}">${better ? '▲' : '▼'} ${t.unit === 'time' ? L.fmtTime(Math.abs(diff)) : Math.abs(diff)} t.o.v. eerste</span>` : '';
-      box.append(h(`<section class="card"><div class="card-h"><h3>${t.name}</h3><small>PR ${L.fmtTest(t, b.value)}</small></div><div class="peil-now"><b>${L.fmtTest(t, last.value)}</b>${dtxt}</div>${lineChart(t, s)}</section>`));
+      const dtxt = s.length > 1 && diff !== 0 ? `<span class="${better ? 'up' : 'down'}">${better ? '▲' : '▼'} ${t.unit === 'time' ? L.fmtTime(Math.abs(diff)) : Math.abs(diff)}</span>` : `<span class="muted">${s.length === 1 ? 'nulmeting' : 'gelijk'}</span>`;
+      card.append(h(`<button class="prow" data-test="${t.id}"><span class="pn"><b>${t.name}</b><small>${s.length}× · laatst ${L.fmtDate(last.date)}</small></span>${spark(s.map((x) => x.value), t.better === 'lo') || '<span></span>'}<span class="pv"><b>${L.fmtTest(t, last.value)}</b>${dtxt}</span></button>`));
     });
+    box.append(card);
   }
-  if (!any) box.append(h(`<div class="card empty"><h3>Nog geen peilmomenten</h3><p class="muted">Doe de peilsessie via Trainen › Peil. Dit is je nulmeting: elke 6 weken zie je hier je lijn.</p></div>`));
-  const ph = h(`<section class="card"><div class="card-h"><h3>Houding</h3><small>zijaanzicht</small></div><div class="photos"><p class="muted">Nog geen foto's. De peilsessie eindigt met een houdingsfoto.</p></div></section>`);
-  box.append(ph);
+  if (!any) box.append(h(`<div class="card empty"><h3>Nog geen metingen</h3><p class="muted">Log een test wanneer jij wilt. Je eerste meting is je nulpunt; daarna zie je hier per test je ontwikkeling.</p></div>`));
+  const ph = h(`<section class="card"><div class="card-h"><h3>Houding</h3><small>zijaanzicht</small></div><div class="photos"></div></section>`);
   store.allPhotoIds().then(async (ids) => {
     ids = ids.filter((i) => i.startsWith('posture-')).sort();
     if (!ids.length) return;
+    box.append(ph);
     const wrap = ph.querySelector('.photos'); wrap.innerHTML = '';
     const show = ids.length > 1 ? [ids[0], ids.at(-1)] : ids;
     for (const id of show) {
